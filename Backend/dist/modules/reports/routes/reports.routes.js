@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.reportsRoutes = void 0;
+const express_1 = require("express");
+const reports_controller_1 = require("../controller/reports.controller");
+const router = (0, express_1.Router)();
+router.get("/attendance", reports_controller_1.reportsController.getAttendance.bind(reports_controller_1.reportsController));
+router.get("/production", reports_controller_1.reportsController.getProduction.bind(reports_controller_1.reportsController));
+router.get("/workers", reports_controller_1.reportsController.getWorkers.bind(reports_controller_1.reportsController));
+router.get("/machines", reports_controller_1.reportsController.getMachines.bind(reports_controller_1.reportsController));
+router.get("/qc", reports_controller_1.reportsController.getQC.bind(reports_controller_1.reportsController));
+router.get("/bundles", reports_controller_1.reportsController.getBundles.bind(reports_controller_1.reportsController));
+router.get("/dashboard", reports_controller_1.reportsController.getDashboard.bind(reports_controller_1.reportsController));
+router.get("/export", reports_controller_1.reportsController.exportReport.bind(reports_controller_1.reportsController));
+exports.reportsRoutes = router;

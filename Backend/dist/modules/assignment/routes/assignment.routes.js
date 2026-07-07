@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const assignment_controller_1 = require("../controller/assignment.controller");
+const router = (0, express_1.Router)();
+const assignmentController = new assignment_controller_1.AssignmentController();
+router.post("/", assignmentController.createAssignment);
+router.get("/", assignmentController.getAllAssignments);
+router.get("/:id", assignmentController.getAssignmentById);
+router.patch("/:id/release", assignmentController.releaseAssignment);
+router.put("/:id", assignmentController.updateAssignment);
+exports.default = router;

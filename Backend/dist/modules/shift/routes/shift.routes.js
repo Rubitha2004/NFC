@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const shift_controller_1 = require("../controller/shift.controller");
+const router = (0, express_1.Router)();
+const controller = new shift_controller_1.ShiftController();
+router.post("/", controller.create);
+router.get("/", controller.getAll);
+router.get("/:id", controller.getById);
+router.put("/:id", controller.update);
+router.patch("/:id/status", controller.changeStatus);
+exports.default = router;

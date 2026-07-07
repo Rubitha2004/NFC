@@ -1,0 +1,503 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Assignment {
+  id          Int              @id @default(autoincrement())
+  workerId    Int
+  machineId   Int
+  operationId Int
+  shiftId     Int
+  assignedBy  String?
+  assignedAt  DateTime         @default(now())
+  releasedAt  DateTime?
+  status      AssignmentStatus @default(ACTIVE)
+  remarks     String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime              @updatedAt
+  machine     Machine          @relation(fields: [machineId], references: [id])
+  operation   Operation        @relation(fields: [operationId], references: [id])
+  shift       Shift            @relation(fields: [shiftId], references: [id])
+  worker      Worker           @relation(fields: [workerId], references: [id])
+  attendances Attendance[]
+
+  @@map("assignments")
+}
+
+model Attendance {
+  id             Int            @id @default(autoincrement())
+  workerId       Int
+  assignmentId   Int
+  terminalId     Int
+  machineId      Int
+  shiftId        Int
+  attendanceType AttendanceType
+  tapTime        DateTime       @default(now())
+  status         RecordStatus   @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  assignment     Assignment     @relation(fields: [assignmentId], references: [id])
+  machine        Machine        @relation(fields: [machineId], references: [id])
+  shift          Shift          @relation(fields: [shiftId], references: [id])
+  terminal       Terminal       @relation(fields: [terminalId], references: [id])
+  worker         Worker         @relation(fields: [workerId], references: [id])
+
+  @@map("attendances")
+}
+
+model BundleTransaction {
+  id                                                         Int               @id @default(autoincrement())
+  bundleId                                                   Int
+  productionOrderId                                          Int
+  fromOperationId                                            Int?
+  toOperationId                                              Int?
+  fromWorkerId                                               Int?
+  toWorkerId                                                 Int?
+  fromMachineId                                              Int?
+  toMachineId                                                Int?
+  quantity                                                   Int
+  transactionType                                            TransactionType
+  transactionTime                                            DateTime          @default(now())
+  remarks                                                    String?
+  createdAt                                                  DateTime          @default(now())
+  bundle                                                     Bundle            @relation(fields: [bundleId], references: [id])
+  fromMachine                                                Machine?          @relation("BundleTransactionsFromMachine", fields: [fromMachineId], references: [id])
+  fromOperation                                              Operation?        @relation("BundleTransactionsFromOperation", fields: [fromOperationId], references: [id])
+  fromWorker                                                 Worker?           @relation("BundleTransactionsFromWorker", fields: [fromWorkerId], references: [id])
+  productionOrder                                            ProductionOrder   @relation(fields: [productionOrderId], references: [id])
+  toMachine                                                  Machine?          @relation("BundleTransactionsToMachine", fields: [toMachineId], references: [id])
+  toOperation                                                Operation?        @relation("BundleTransactionsToOperation", fields: [toOperationId], references: [id])
+  toWorker                                                   Worker?           @relation("BundleTransactionsToWorker", fields: [toWorkerId], references: [id])
+  qcInspections                                              QC[]
+
+  @@map("bundle_transactions")
+}
+
+model Bundle {
+  id                  Int                   @id @default(autoincrement())
+  bundleNumber        String                @unique
+  productionOrderId   Int
+  currentOperationId  Int?
+  currentMachineId    Int?
+  currentWorkerId     Int?
+  quantity            Int
+  completedQuantity   Int                   @default(0)
+  status              BundleStatus          @default(CREATED)
+  createdAt           DateTime              @default(now())
+  updatedAt DateTime @updatedAt
+  bundleTransactions  BundleTransaction[]
+  currentMachine      Machine?              @relation(fields: [currentMachineId], references: [id])
+  currentOperation    Operation?            @relation(fields: [currentOperationId], references: [id])
+  currentWorker       Worker?               @relation(fields: [currentWorkerId], references: [id])
+  productionOrder     ProductionOrder       @relation(fields: [productionOrderId], references: [id])
+  qcInspections       QC[]
+  productionTasks     ProductionTask[]
+  tagAssignments      BundleTagAssignment[]
+  stageLogs           BundleStageLog[]
+  qcCheckLogs         QCCheckLog[]
+
+  @@map("bundles")
+}
+
+model Department {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  name        String       @unique
+  description String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime              @updatedAt
+  machines    Machine[]
+  workers     Worker[]
+  productionTasks ProductionTask[]
+
+  @@map("departments")
+}
+
+model MachineType {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  name        String
+  description String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime              @updatedAt
+  machines    Machine[]
+
+  @@map("machine_types")
+}
+
+model Machine {
+  id                                                              Int                   @id @default(autoincrement())
+  machineCode                                                     String                @unique
+  machineName                                                     String
+  departmentId                                                    Int
+  machineTypeId                                                   Int
+  terminalId                                                      Int                   @unique
+  status                                                          RecordStatus          @default(ACTIVE)
+  remarks                                                         String?
+  createdAt                                                       DateTime              @default(now())
+  updatedAt DateTime @updatedAt
+  assignments                                                     Assignment[]
+  attendances                                                     Attendance[]
+  bundleTransactionsFromMachine                                   BundleTransaction[]   @relation("BundleTransactionsFromMachine")
+  bundleTransactionsToMachine                                     BundleTransaction[]   @relation("BundleTransactionsToMachine")
+  bundles                                                         Bundle[]
+  department                                                      Department            @relation(fields: [departmentId], references: [id])
+  machineType                                                     MachineType           @relation(fields: [machineTypeId], references: [id])
+  terminal                                                        Terminal              @relation(fields: [terminalId], references: [id])
+  qcInspections                                                   QC[]
+  productionTasks                                                 ProductionTask[]
+
+  @@map("machines")
+}
+
+model Operation {
+  id                                                                  Int                   @id @default(autoincrement())
+  operationCode                                                       String                @unique
+  operationName                                                       String                @unique
+  description                                                         String?
+  standardMinuteValue                                                 Float
+  displayOrder                                                        Int                   @default(0)
+  status                                                              RecordStatus          @default(ACTIVE)
+  createdAt                                                           DateTime              @default(now())
+  updatedAt DateTime @updatedAt
+  assignments                                                         Assignment[]
+  bundleTransactionsFromOperation                                     BundleTransaction[]   @relation("BundleTransactionsFromOperation")
+  bundleTransactionsToOperation                                       BundleTransaction[]   @relation("BundleTransactionsToOperation")
+  bundles                                                             Bundle[]
+  productionTasks                                                     ProductionTask[]
+  stageLogs                                                           BundleStageLog[]
+  qcCheckLogs                                                         QCCheckLog[]
+
+  @@map("operations")
+}
+
+model ProductionOrder {
+  id                  Int                   @id @default(autoincrement())
+  orderNumber         String                @unique
+  buyerName           String
+  styleNumber         String
+  styleName           String
+  color               String
+  size                String
+  plannedQuantity     Int
+  completedQuantity   Int                   @default(0)
+  priority            Int                   @default(0)
+  plannedStartDate    DateTime
+  plannedEndDate      DateTime
+  status              OrderStatus           @default(PLANNED)
+  remarks             String?
+  createdAt           DateTime              @default(now())
+  updatedAt DateTime @updatedAt
+  bundleTransactions  BundleTransaction[]
+  bundles             Bundle[]
+  productionTasks     ProductionTask[]
+
+  @@map("production_orders")
+}
+
+model QC {
+  id                  Int                 @id @default(autoincrement())
+  bundleId            Int
+  transactionId       Int
+  workerId            Int?
+  machineId           Int?
+  inspectorName       String?
+  passQuantity        Int
+  rejectQuantity      Int
+  reworkQuantity      Int
+  inspectionTime      DateTime            @default(now())
+  remarks             String?
+  createdAt           DateTime            @default(now())
+  bundle              Bundle              @relation(fields: [bundleId], references: [id])
+  machine             Machine?            @relation(fields: [machineId], references: [id])
+  transaction         BundleTransaction   @relation(fields: [transactionId], references: [id])
+  worker              Worker?             @relation(fields: [workerId], references: [id])
+
+  @@map("qc_inspections")
+}
+
+model Shift {
+  id           Int           @id @default(autoincrement())
+  shiftCode    String        @unique
+  shiftName    String        @unique
+  startTime    String
+  endTime      String
+  breakStart   String?
+  breakEnd     String?
+  workingHours Float
+  status       RecordStatus  @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt DateTime @updatedAt
+  assignments  Assignment[]
+  attendances  Attendance[]
+  productionTasks ProductionTask[]
+
+  @@map("shifts")
+}
+
+model Skill {
+  id            Int             @id @default(autoincrement())
+  code          String          @unique
+  name          String
+  description   String?
+  status        RecordStatus    @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  updatedAt DateTime @updatedAt
+  workerSkills  WorkerSkill[]
+
+  @@map("skills")
+}
+
+model Terminal {
+  id              Int           @id @default(autoincrement())
+  terminalCode    String        @unique
+  serialNumber    String?
+  ipAddress       String?
+  firmwareVersion String?
+  status          RecordStatus  @default(ACTIVE)
+  lastHeartbeat   DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt DateTime @updatedAt
+  macAddress      String?
+  terminalName    String?
+  attendances     Attendance[]
+  machine         Machine?
+
+  @@map("terminals")
+}
+
+model WorkerGrade {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  name        String
+  description String?
+  priority    Int
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime              @updatedAt
+  workers     Worker[]
+
+  @@map("worker_grades")
+}
+
+model WorkerSkill {
+  id        Int      @id @default(autoincrement())
+  workerId  Int
+  skillId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  skill     Skill    @relation(fields: [skillId], references: [id])
+  worker    Worker   @relation(fields: [workerId], references: [id])
+
+  @@unique([workerId, skillId])
+  @@map("worker_skills")
+}
+
+model Worker {
+  id                                                            Int                   @id @default(autoincrement())
+  employeeCode                                                  String                @unique
+  nfcCardId                                                     String                @unique
+  firstName                                                     String
+  lastName                                                      String
+  gender                                                        String?
+  phone                                                         String?
+  email                                                         String?
+  dateOfBirth                                                   DateTime?
+  joiningDate                                                   DateTime?
+  departmentId                                                  Int
+  gradeId                                                       Int
+  status                                                        RecordStatus          @default(ACTIVE)
+  remarks                                                       String?
+  createdAt                                                     DateTime              @default(now())
+  updatedAt DateTime @updatedAt
+  assignments                                                   Assignment[]
+  attendances                                                   Attendance[]
+  bundleTransactionsFromWorker                                  BundleTransaction[]   @relation("BundleTransactionsFromWorker")
+  bundleTransactionsToWorker                                    BundleTransaction[]   @relation("BundleTransactionsToWorker")
+  bundles                                                       Bundle[]
+  qcInspections                                                 QC[]
+  skills                                                        WorkerSkill[]
+  department                                                    Department            @relation(fields: [departmentId], references: [id])
+  grade                                                         WorkerGrade           @relation(fields: [gradeId], references: [id])
+  productionTasks                                               ProductionTask[]
+  stageLogsOperated                                             BundleStageLog[]      @relation("StageLogOperator")
+  qcChecksPerformed                                             QCCheckLog[]          @relation("QCCheckPerson")
+  qcChecksAudited                                               QCCheckLog[]          @relation("QCCheckedWorker")
+
+  @@map("workers")
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum AttendanceType {
+  IN
+  OUT
+}
+
+enum BundleStatus {
+  CREATED
+  IN_PROGRESS
+  WAITING
+  COMPLETED
+  QC_PENDING
+  QC_COMPLETED
+}
+
+enum OrderStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TransactionType {
+  CREATE
+  START
+  COMPLETE
+  TRANSFER
+  HOLD
+  REWORK
+  QC
+  FINISHED
+}
+
+model ProductionTask {
+  id                Int             @id @default(autoincrement())
+  taskId            String          @unique
+  productionOrderId Int
+  bundleId          Int?
+  operationId       Int
+  departmentId      Int
+  machineId         Int?
+  workerId          Int?
+  shiftId           Int?
+  priority          Int             @default(0)
+  estimatedTime     Int             // In minutes
+  targetQuantity    Int
+  status            TaskStatus      @default(CREATED)
+  supervisor        String?
+  remarks           String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  bundle            Bundle?         @relation(fields: [bundleId], references: [id])
+  operation         Operation       @relation(fields: [operationId], references: [id])
+  department        Department      @relation(fields: [departmentId], references: [id])
+  machine           Machine?        @relation(fields: [machineId], references: [id])
+  worker            Worker?         @relation(fields: [workerId], references: [id])
+  shift             Shift?          @relation(fields: [shiftId], references: [id])
+
+  @@map("production_tasks")
+}
+
+enum TaskStatus {
+  CREATED
+  PLANNED
+  ASSIGNED
+  ACCEPTED
+  RUNNING
+  COMPLETED
+  QC
+  TRANSFERRED
+  CLOSED
+}
+
+// ─── Tag Pool ────────────────────────────────────────────────────────────────
+
+model BundleTagAssignment {
+  id          Int           @id @default(autoincrement())
+  tagCode     String        @unique
+  bundleId    Int?
+  assignedAt  DateTime?
+  releasedAt  DateTime?
+  status      TagStatus     @default(AVAILABLE)
+  assignedBy  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  bundle      Bundle?       @relation(fields: [bundleId], references: [id])
+
+  stageLogs   BundleStageLog[]
+  qcChecks    QCCheckLog[]
+
+  @@map("bundle_tag_assignments")
+}
+
+// ─── Stage Scan Log ───────────────────────────────────────────────────────────
+
+model BundleStageLog {
+  id            Int                   @id @default(autoincrement())
+  bundleId      Int
+  tagId         Int
+  operationId   Int
+  operatorId    Int
+  inTime        DateTime              @default(now())
+  outTime       DateTime?
+  remarks       String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  bundle        Bundle                @relation(fields: [bundleId], references: [id])
+  tag           BundleTagAssignment   @relation(fields: [tagId], references: [id])
+  operation     Operation             @relation(fields: [operationId], references: [id])
+  operator      Worker                @relation("StageLogOperator", fields: [operatorId], references: [id])
+
+  @@map("bundle_stage_logs")
+}
+
+// ─── Two-Tier QC Check Log ────────────────────────────────────────────────────
+
+model QCCheckLog {
+  id            Int                   @id @default(autoincrement())
+  bundleId      Int
+  tagId         Int?
+  qcPersonId    Int
+  qcTier        QCTier
+  operationId   Int?
+  workerId      Int?
+  status        QCCheckStatus
+  defectNotes   String?
+  checkedAt     DateTime              @default(now())
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  bundle        Bundle                @relation(fields: [bundleId], references: [id])
+  tag           BundleTagAssignment?  @relation(fields: [tagId], references: [id])
+  qcPerson      Worker                @relation("QCCheckPerson", fields: [qcPersonId], references: [id])
+  operation     Operation?            @relation(fields: [operationId], references: [id])
+  worker        Worker?               @relation("QCCheckedWorker", fields: [workerId], references: [id])
+
+  @@map("qc_check_logs")
+}
+
+// ─── New Enums ────────────────────────────────────────────────────────────────
+
+enum TagStatus {
+  AVAILABLE
+  ASSIGNED
+}
+
+enum QCTier {
+  LINE_QC
+  FINAL_QC
+}
+
+enum QCCheckStatus {
+  PASS
+  FAIL
+  REWORK
+}

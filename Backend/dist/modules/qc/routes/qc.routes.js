@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const qc_controller_1 = require("../controller/qc.controller");
+const router = (0, express_1.Router)();
+const controller = new qc_controller_1.QCController();
+router.post('/', controller.create.bind(controller));
+router.get('/', controller.getAll.bind(controller));
+router.get('/:id', controller.getById.bind(controller));
+router.put('/:id', controller.update.bind(controller));
+exports.default = router;

@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.dashboardRoutes = void 0;
+const express_1 = require("express");
+const dashboard_controller_1 = require("../controller/dashboard.controller");
+const router = (0, express_1.Router)();
+router.get('/overview', dashboard_controller_1.dashboardController.getOverview.bind(dashboard_controller_1.dashboardController));
+router.get('/workers', dashboard_controller_1.dashboardController.getWorkersSummary.bind(dashboard_controller_1.dashboardController));
+router.get('/machines', dashboard_controller_1.dashboardController.getMachinesSummary.bind(dashboard_controller_1.dashboardController));
+router.get('/production', dashboard_controller_1.dashboardController.getProductionSummary.bind(dashboard_controller_1.dashboardController));
+router.get('/qc', dashboard_controller_1.dashboardController.getQCSummary.bind(dashboard_controller_1.dashboardController));
+router.get('/attendance', dashboard_controller_1.dashboardController.getAttendanceSummary.bind(dashboard_controller_1.dashboardController));
+router.get('/live-floor', dashboard_controller_1.dashboardController.getLiveFloor.bind(dashboard_controller_1.dashboardController));
+exports.dashboardRoutes = router;

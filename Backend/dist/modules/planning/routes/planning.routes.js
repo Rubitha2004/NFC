@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.planningRoutes = void 0;
+const express_1 = require("express");
+const planning_controller_1 = require("../controller/planning.controller");
+const router = (0, express_1.Router)();
+router.get("/dashboard", planning_controller_1.planningController.getDashboardMetrics);
+router.get("/resources", planning_controller_1.planningController.getResourceAvailability);
+router.get("/tasks", planning_controller_1.planningController.getAllTasks);
+router.post("/tasks", planning_controller_1.planningController.createTask);
+router.get("/tasks/:id", planning_controller_1.planningController.getTaskById);
+router.patch("/tasks/:id", planning_controller_1.planningController.updateTask);
+router.post("/scheduler/auto/:id", planning_controller_1.planningController.runAutoScheduler);
+router.post("/publish", planning_controller_1.planningController.publishPlan);
+exports.planningRoutes = router;

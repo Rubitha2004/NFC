@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const terminal_controller_1 = require("../controller/terminal.controller");
+const router = (0, express_1.Router)();
+const terminalController = new terminal_controller_1.TerminalController();
+router.post("/", terminalController.createTerminal);
+router.get("/", terminalController.getAllTerminals);
+router.get("/:id", terminalController.getTerminalById);
+router.put("/:id", terminalController.updateTerminal);
+router.patch("/:id/status", terminalController.changeTerminalStatus);
+exports.default = router;

@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const bundle_transaction_controller_1 = require("../controller/bundle-transaction.controller");
+const router = (0, express_1.Router)();
+const controller = new bundle_transaction_controller_1.BundleTransactionController();
+router.post('/', controller.create.bind(controller));
+router.get('/', controller.getAll.bind(controller));
+router.get('/:id', controller.getById.bind(controller));
+router.get('/bundle/:bundleId', controller.getByBundle.bind(controller));
+exports.default = router;
