@@ -56,9 +56,42 @@ export function OrderAllocations({ order }: { order: ProductionOrder }) {
         })}
       </div>
 
-      <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6 text-center text-white/40">
-        <p className="text-sm">Detailed allocation lists would appear here in production.</p>
-        <p className="text-xs mt-2">Connects to Worker and Machine management modules.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-white/80 mb-3 flex items-center">
+            <Users className="w-4 h-4 mr-2 text-blue-400" /> Worker Roster
+          </h3>
+          <div className="space-y-2">
+            {order.allocations.workersList?.length ? (
+              order.allocations.workersList.map(w => (
+                <div key={w.id} className="flex justify-between items-center p-2 rounded-lg bg-zinc-950/50 border border-white/5">
+                  <span className="text-sm text-white/90">{w.name}</span>
+                  <span className="text-xs text-white/40 font-mono">{w.code}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-white/30 text-center py-4">No workers assigned</p>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-white/80 mb-3 flex items-center">
+            <Settings className="w-4 h-4 mr-2 text-emerald-400" /> Machine Roster
+          </h3>
+          <div className="space-y-2">
+            {order.allocations.machinesList?.length ? (
+              order.allocations.machinesList.map(m => (
+                <div key={m.id} className="flex justify-between items-center p-2 rounded-lg bg-zinc-950/50 border border-white/5">
+                  <span className="text-sm text-white/90">{m.name}</span>
+                  <span className="text-xs text-white/40 font-mono">{m.code}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-white/30 text-center py-4">No machines assigned</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

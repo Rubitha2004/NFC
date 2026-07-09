@@ -1,8 +1,28 @@
 import prisma from "../../../config/prisma";
 import { TaskStatus } from "@prisma/client";
 import { CreateTaskDTO, UpdateTaskDTO, PublishPlanDTO } from "../dto/planning.dto";
+import { resourceAvailabilityService } from "./resource-availability.service";
 
 export class PlanningService {
+  private async generateUniqueTaskId(tx: any): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const count = await tx.productionTask.count();
+      const taskId = `TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${(count + 1).toString().padStart(4, '0')}`;
+      const exists = await tx.productionTask.findUnique({ where: { taskId } });
+      if (!exists) return taskId;
+    }
+    throw new Error("Could not generate a unique task ID, please retry");
+  }
+
+  private async generateUniqueBundleNumber(tx: any, orderNumber: string): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const count = await tx.bundle.count({ where: { productionOrder: { orderNumber } } });
+      const bundleNumber = `${orderNumber}-B${(count + 1).toString().padStart(3, '0')}`;
+      const exists = await tx.bundle.findUnique({ where: { bundleNumber } });
+      if (!exists) return bundleNumber;
+    }
+    throw new Error("Could not generate a unique bundle number, please retry");
+  }
   async getDashboardMetrics() {
     const totalOrders = await prisma.productionOrder.count();
     const activeOrders = await prisma.productionOrder.count({ where: { status: "IN_PROGRESS" } });
@@ -63,22 +83,47 @@ export class PlanningService {
   }
 
   async createTask(data: CreateTaskDTO) {
-    const count = await prisma.productionTask.count();
-    const taskId = `TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${(count + 1).toString().padStart(4, '0')}`;
-    
-    return prisma.productionTask.create({
-      data: {
-        ...data,
-        taskId,
-      },
-      include: {
-        productionOrder: true,
-        operation: true,
-      },
+    return prisma.$transaction(async (tx) => {
+      const taskId = await this.generateUniqueTaskId(tx);
+      
+      return tx.productionTask.create({
+        data: {
+          ...data,
+          taskId,
+        },
+        include: {
+          productionOrder: true,
+          operation: true,
+        },
+      });
     });
   }
 
   async updateTask(id: number, data: UpdateTaskDTO) {
+    if (data.status) {
+      const task = await prisma.productionTask.findUnique({ where: { id } });
+      if (!task) throw new Error("Task not found");
+      
+      const allowedTransitions: Record<string, string[]> = {
+        'CREATED': ['PLANNED', 'ASSIGNED'],
+        'PLANNED': ['ASSIGNED', 'CREATED'],
+        'ASSIGNED': ['ACCEPTED', 'RUNNING', 'PLANNED'],
+        'ACCEPTED': ['RUNNING', 'ASSIGNED'],
+        'RUNNING': ['COMPLETED', 'ASSIGNED', 'QC', 'ACCEPTED'],
+        'COMPLETED': ['QC', 'TRANSFERRED', 'CLOSED'],
+        'QC': ['COMPLETED', 'TRANSFERRED', 'RUNNING'],
+        'TRANSFERRED': ['CLOSED'],
+        'CLOSED': []
+      };
+
+      if (task.status !== data.status) {
+         const allowed = allowedTransitions[task.status] || [];
+         if (!allowed.includes(data.status)) {
+            throw new Error(`Invalid status transition from ${task.status} to ${data.status}`);
+         }
+      }
+    }
+
     return prisma.productionTask.update({
       where: { id },
       data,
@@ -86,25 +131,8 @@ export class PlanningService {
   }
 
   async getResourceAvailability() {
-    const workers = await prisma.worker.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        assignments: { where: { status: "ACTIVE" } },
-        skills: { include: { skill: true } },
-        grade: true,
-        department: true
-      }
-    });
-
-    const machines = await prisma.machine.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        assignments: { where: { status: "ACTIVE" } },
-        machineType: true,
-        department: true
-      }
-    });
-
+    const workers = await resourceAvailabilityService.getAvailableWorkers();
+    const machines = await resourceAvailabilityService.getAvailableMachines();
     return { workers, machines };
   }
 
@@ -116,162 +144,229 @@ export class PlanningService {
 
     if (!task) throw new Error("Task not found");
 
-    const availableMachines = await prisma.machine.findMany({
-      where: { 
-        status: "ACTIVE", 
-        departmentId: task.departmentId,
-        assignments: { none: { status: "ACTIVE" } }
-      },
-      take: 1
+    const availableMachines = await resourceAvailabilityService.getAvailableMachines({ 
+      departmentId: task.departmentId 
     });
 
-    const availableWorkers = await prisma.worker.findMany({
-      where: {
-        status: "ACTIVE",
-        departmentId: task.departmentId,
-        assignments: { none: { status: "ACTIVE" } }
-      },
-      take: 1
+    const availableWorkers = await resourceAvailabilityService.getAvailableWorkers({ 
+      departmentId: task.departmentId, 
+      requiredSkillId: task.operation.requiredSkillId 
     });
+
+    // Score workers based on grade, skills, and current load
+    const scoredWorkers = availableWorkers.map(w => {
+      let score = 0;
+      // Base score from grade (A=4, B=3, C=2, D=1)
+      const gradeScore = 5 - w.grade.priority;
+      score += gradeScore * 10;
+      
+      // Skill match
+      const hasRequiredSkill = w.skills.some(s => s.skillId === task.operation.requiredSkillId);
+      if (hasRequiredSkill) score += 50;
+
+      // Deduct points if they have active assignments (load balancing)
+      // Since getAvailableWorkers filters out active assignments, they should all be 0 here,
+      // but in a real system we'd check their total assigned tasks for the day.
+      const taskLoad = 0; // w.productionTasks?.length || 0;
+      score -= taskLoad * 5;
+
+      return { worker: w, score };
+    }).sort((a, b) => b.score - a.score);
+
+    const bestWorker = scoredWorkers[0]?.worker || null;
+    let skillMatch = 0;
+    let efficiency = 0;
+    
+    if (bestWorker) {
+      skillMatch = bestWorker.skills.some(s => s.skillId === task.operation.requiredSkillId) ? 100 : 75;
+      efficiency = Math.max(50, 100 - (bestWorker.grade.priority * 5));
+    }
+
+    const estimatedMinutes = task.estimatedTime;
+    const now = new Date();
+    const scheduledStart = now;
+    const scheduledEnd = new Date(now.getTime() + estimatedMinutes * 60000);
 
     return {
+      taskId: task.id,
       recommendedMachine: availableMachines[0] || null,
-      recommendedWorker: availableWorkers[0] || null,
-      skillMatch: 95,
-      efficiency: 92,
-      estimatedCompletionTime: `${Math.ceil(task.estimatedTime / 60)}h ${task.estimatedTime % 60}m`
+      recommendedWorker: bestWorker,
+      skillMatch,
+      efficiency,
+      scheduledStart,
+      scheduledEnd,
+      estimatedCompletionTime: `${Math.ceil(estimatedMinutes / 60)}h ${estimatedMinutes % 60}m`
     };
   }
 
   async publishPlan(data: PublishPlanDTO) {
-    const order = await prisma.productionOrder.findUnique({
-      where: { id: data.productionOrderId },
-      include: { bundles: true }
-    });
-
-    if (!order) throw new Error("Production order not found");
-
-    // 1. Generate Bundles if requested
-    const newBundles = [];
-    if (data.bundles && data.bundles.length > 0) {
-      let nextBundleIndex = order.bundles.length + 1;
-      
-      const availableTags = await prisma.bundleTagAssignment.findMany({
-        where: { status: "AVAILABLE" },
-        take: data.bundles.length,
-        orderBy: { tagCode: 'asc' }
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.productionOrder.findUnique({
+        where: { id: data.productionOrderId },
+        include: { bundles: true }
       });
-      
-      if (availableTags.length < data.bundles.length) {
-        throw new Error(`Not enough available tags in the pool. Need ${data.bundles.length}, but only have ${availableTags.length}. Please register more tags first.`);
-      }
 
-      for (const b of data.bundles) {
-        const bundleNumber = `${order.orderNumber}-B${nextBundleIndex.toString().padStart(3, '0')}`;
-        newBundles.push({
-          bundleNumber,
-          productionOrderId: order.id,
-          quantity: b.quantity,
-          status: "CREATED" as const
+      if (!order) throw new Error("Production order not found");
+
+      // 1. Generate Bundles if requested
+      const newBundles = [];
+      if (data.bundles && data.bundles.length > 0) {
+        const availableTags = await tx.bundleTagAssignment.findMany({
+          where: { status: "AVAILABLE" },
+          take: data.bundles.length,
+          orderBy: { tagCode: 'asc' }
         });
-        nextBundleIndex++;
-      }
-      
-      if (newBundles.length > 0) {
-        const createdBundles = await prisma.$transaction(
-           newBundles.map(b => prisma.bundle.create({ data: b }))
-        );
         
-        const tagUpdates = createdBundles.map((b, i) => {
-           return prisma.bundleTagAssignment.update({
+        if (availableTags.length < data.bundles.length) {
+          throw new Error(`Not enough available tags in the pool. Need ${data.bundles.length}, but only have ${availableTags.length}. Please register more tags first.`);
+        }
+
+        for (let i = 0; i < data.bundles.length; i++) {
+          const b = data.bundles[i];
+          const bundleNumber = await this.generateUniqueBundleNumber(tx, order.orderNumber);
+          const safeQuantity = Math.max(1, Math.floor(b.quantity));
+          const bundle = await tx.bundle.create({
+            data: {
+              bundleNumber,
+              productionOrderId: order.id,
+              quantity: safeQuantity,
+              status: "CREATED"
+            }
+          });
+          newBundles.push(bundle);
+
+          await tx.bundleTagAssignment.update({
              where: { id: availableTags[i].id },
              data: {
-                bundleId: b.id,
+                bundleId: bundle.id,
                 status: "ASSIGNED",
                 assignedAt: new Date(),
                 releasedAt: null,
                 assignedBy: "System Planner"
              }
-           });
-        });
-        await prisma.$transaction(tagUpdates);
+          });
+        }
       }
-    }
 
-    // 2. Create Assignments (Activate for IoT)
-    let defaultShiftId = undefined;
-    if (data.assignments.some(a => !a.shiftId)) {
-      const activeShift = await prisma.shift.findFirst({ where: { status: "ACTIVE" } });
-      if (activeShift) defaultShiftId = activeShift.id;
-    }
+      // 2. Create Assignments (Activate for IoT) with safety
+      let defaultShiftId = undefined;
+      if (data.assignments.some(a => !a.shiftId)) {
+        const activeShift = await tx.shift.findFirst({ where: { status: "ACTIVE" } });
+        if (activeShift) defaultShiftId = activeShift.id;
+      }
 
-    const assignmentsToCreate = data.assignments.map(a => {
-      const shiftId = a.shiftId || defaultShiftId;
-      if (!shiftId) throw new Error("No active shift found for assignment");
-      return {
-        operationId: a.operationId,
-        workerId: a.workerId,
-        machineId: a.machineId,
-        shiftId: shiftId,
-        status: "ACTIVE" as const,
-        assignedBy: "System Planner"
-      };
-    });
-
-    if (assignmentsToCreate.length > 0) {
-      // In a real app we might want to close existing assignments for these workers/machines first
-      // But for simplicity in the unified planner, we'll just create new active assignments.
-      await prisma.assignment.createMany({
-        data: assignmentsToCreate
-      });
-    }
-
-    // 2.5 Create Production Tasks for the Planning Board
-    if (data.operations && data.operations.length > 0) {
-      const defaultDept = await prisma.department.findFirst();
-      const deptId = defaultDept?.id || 1;
-      let taskCount = await prisma.productionTask.count();
-      
-      for (const opId of data.operations) {
-        taskCount++;
-        const taskId = `TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${taskCount.toString().padStart(4, '0')}`;
+      const createdAssignments = [];
+      for (const a of data.assignments) {
+        const shiftId = a.shiftId || defaultShiftId;
+        if (!shiftId) throw new Error("No active shift found for assignment");
         
-        const assignmentForOp = assignmentsToCreate.find(a => a.operationId === opId);
-        const op = await prisma.operation.findUnique({ where: { id: opId } });
-        const estimatedTime = op ? Math.ceil(order.plannedQuantity * op.standardMinuteValue) : 60;
+        // Gracefully release any prior active assignments for this machine
+        await tx.assignment.updateMany({
+            where: { machineId: a.machineId, status: 'ACTIVE' },
+            data: { status: 'COMPLETED', releasedAt: new Date() }
+        });
 
-        await prisma.productionTask.create({
+        // Release worker's prior active assignment
+        await tx.assignment.updateMany({
+            where: { workerId: a.workerId, status: 'ACTIVE' },
+            data: { status: 'COMPLETED', releasedAt: new Date() }
+        });
+        
+        const assignment = await tx.assignment.create({
           data: {
-            taskId,
-            productionOrderId: order.id,
-            operationId: opId,
-            departmentId: deptId,
-            machineId: assignmentForOp?.machineId,
-            workerId: assignmentForOp?.workerId,
-            shiftId: assignmentForOp?.shiftId,
-            targetQuantity: order.plannedQuantity,
-            estimatedTime,
-            status: assignmentForOp ? "ASSIGNED" : "PLANNED",
-            priority: order.priority
+            operationId: a.operationId,
+            workerId: a.workerId,
+            machineId: a.machineId,
+            shiftId,
+            status: "ACTIVE" as const,
+            assignedBy: "System Planner"
           }
         });
+        createdAssignments.push(assignment);
       }
-    }
 
-    // 3. Mark Production Order as IN_PROGRESS or PLANNED
-    if (order.status === "PLANNED") {
-      await prisma.productionOrder.update({
-        where: { id: order.id },
-        data: { status: "IN_PROGRESS" }
-      });
-    }
+      // 2.5 Create Production Tasks for the Planning Board
+      if (data.operations && data.operations.length > 0) {
+        const defaultDept = await tx.department.findFirst();
+        const deptId = defaultDept?.id || 1;
+        
+        for (const opId of data.operations) {
+          const assignmentsForOp = data.assignments.filter(a => a.operationId === opId);
+          const op = await tx.operation.findUnique({ where: { id: opId } });
+          const estimatedTime = op ? Math.ceil(order.plannedQuantity * op.standardMinuteValue) : 60;
 
-    return {
-      success: true,
-      message: "Plan published successfully to IoT terminals",
-      bundlesCreated: newBundles.length,
-      assignmentsCreated: assignmentsToCreate.length
-    };
+          if (assignmentsForOp.length > 0) {
+            for (const assignment of assignmentsForOp) {
+              const taskId = await this.generateUniqueTaskId(tx);
+              const splitQuantity = Math.max(1, Math.ceil(order.plannedQuantity / assignmentsForOp.length));
+              const splitTime = Math.max(1, Math.ceil(estimatedTime / assignmentsForOp.length));
+              
+              await tx.productionTask.create({
+                data: {
+                  taskId,
+                  productionOrderId: order.id,
+                  operationId: opId,
+                  departmentId: deptId,
+                  machineId: assignment.machineId,
+                  workerId: assignment.workerId,
+                  shiftId: assignment.shiftId || defaultShiftId,
+                  targetQuantity: splitQuantity,
+                  estimatedTime: splitTime,
+                  status: "ASSIGNED",
+                  priority: order.priority
+                }
+              });
+            }
+          } else {
+            const taskId = await this.generateUniqueTaskId(tx);
+            await tx.productionTask.create({
+              data: {
+                taskId,
+                productionOrderId: order.id,
+                operationId: opId,
+                departmentId: deptId,
+                targetQuantity: order.plannedQuantity,
+                estimatedTime,
+                status: "PLANNED",
+                priority: order.priority
+              }
+            });
+          }
+        }
+      }
+
+      // 3. Mark Production Order as IN_PROGRESS or PLANNED
+      if (order.status === "PLANNED") {
+        await tx.productionOrder.update({
+          where: { id: order.id },
+          data: { status: "IN_PROGRESS" }
+        });
+      }
+
+      return {
+        success: true,
+        message: "Plan published successfully to IoT terminals",
+        bundlesCreated: newBundles.length,
+        assignmentsCreated: createdAssignments.length
+      };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async getHistory() {
+    return prisma.bundleStageLog.findMany({
+      include: {
+        bundle: {
+          include: {
+            productionOrder: true
+          }
+        },
+        tag: true,
+        operation: true,
+        operator: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100
+    });
   }
 }
 

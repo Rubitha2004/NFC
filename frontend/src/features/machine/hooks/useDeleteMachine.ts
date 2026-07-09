@@ -11,6 +11,7 @@ export function useDeleteMachine() {
       toast.success('Machine deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['machines'] });
       queryClient.invalidateQueries({ queryKey: ['machines', id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to delete machine');

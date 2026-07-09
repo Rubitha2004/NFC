@@ -18,6 +18,15 @@ export interface ProductionOrderAPIResponse {
   remarks: string | null;
   createdAt: string;
   updatedAt: string;
+  productionTasks?: { 
+    workerId: number | null, 
+    machineId: number | null,
+    worker?: { firstName: string, lastName: string, employeeCode: string },
+    machine?: { machineName: string, machineCode: string }
+  }[];
+  _count?: {
+    bundles: number;
+  };
 }
 
 const mapPriority = (p: number): 'low' | 'medium' | 'high' | 'urgent' => {
@@ -35,29 +44,66 @@ const mapPriorityToNumber = (p: string): number => {
   return 0;
 };
 
-export const mapProductionOrderAPIToUI = (order: ProductionOrderAPIResponse): ProductionOrder => ({
-  id: String(order.id),
-  orderNumber: order.orderNumber,
-  customerName: order.buyerName,
-  styleNumber: order.styleNumber,
-  color: order.color,
-  size: order.size,
-  targetQuantity: order.plannedQuantity,
-  completedQuantity: order.completedQuantity,
-  defectiveQuantity: 0, // Not present in schema yet
-  department: order.styleName || "Sewing", // Mapping styleName as department fallback or mock
-  priority: mapPriority(order.priority),
-  status: order.status.toLowerCase() as OrderStatus,
-  startDate: order.plannedStartDate,
-  dueDate: order.plannedEndDate,
-  remarks: order.remarks || undefined,
-  timeline: [],
-  allocations: {
-    workersCount: 0,
-    machinesCount: 0,
-    bundlesCount: 0,
+export const mapProductionOrderAPIToUI = (order: ProductionOrderAPIResponse): ProductionOrder => {
+  let workersCount = 0;
+  let machinesCount = 0;
+
+  let workersList: { id: number, name: string, code: string }[] = [];
+  let machinesList: { id: number, name: string, code: string }[] = [];
+
+  if (order.productionTasks) {
+    const uniqueWorkers = new Map();
+    const uniqueMachines = new Map();
+
+    order.productionTasks.forEach(t => {
+      if (t.workerId && t.worker && !uniqueWorkers.has(t.workerId)) {
+        uniqueWorkers.set(t.workerId, {
+          id: t.workerId,
+          name: `${t.worker.firstName} ${t.worker.lastName}`,
+          code: t.worker.employeeCode
+        });
+      }
+      if (t.machineId && t.machine && !uniqueMachines.has(t.machineId)) {
+        uniqueMachines.set(t.machineId, {
+          id: t.machineId,
+          name: t.machine.machineName,
+          code: t.machine.machineCode
+        });
+      }
+    });
+
+    workersCount = uniqueWorkers.size;
+    machinesCount = uniqueMachines.size;
+    workersList = Array.from(uniqueWorkers.values());
+    machinesList = Array.from(uniqueMachines.values());
   }
-});
+
+  return {
+    id: String(order.id),
+    orderNumber: order.orderNumber,
+    customerName: order.buyerName,
+    styleNumber: order.styleNumber,
+    color: order.color,
+    size: order.size,
+    targetQuantity: order.plannedQuantity,
+    completedQuantity: order.completedQuantity,
+    defectiveQuantity: 0, // Not present in schema yet
+    department: order.styleName || "Sewing", // Mapping styleName as department fallback or mock
+    priority: mapPriority(order.priority),
+    status: order.status.toLowerCase() as OrderStatus,
+    startDate: order.plannedStartDate,
+    dueDate: order.plannedEndDate,
+    remarks: order.remarks || undefined,
+    timeline: [],
+    allocations: {
+      workersCount,
+      machinesCount,
+      bundlesCount: order._count?.bundles || 0,
+      workersList,
+      machinesList
+    }
+  };
+};
 
 export const productionOrderService = {
   async getProductionOrders() {

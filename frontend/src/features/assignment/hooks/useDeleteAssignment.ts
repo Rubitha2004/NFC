@@ -11,6 +11,7 @@ export function useDeleteAssignment() {
       toast.success('Assignment released successfully');
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       queryClient.invalidateQueries({ queryKey: ['assignments', id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to release assignment');

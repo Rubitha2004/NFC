@@ -9,11 +9,12 @@ import { useFactoryStore } from '../store/factory.store';
 import { useFactoryData } from '../hooks/useFactoryData';
 import { FactoryPseudo3DView } from './pseudo3d/FactoryPseudo3DView';
 import { Factory3DView } from './three3d/Factory3DView';
+import { ProductionLine } from './ProductionLine';
 
 // ─── Root Factory Floor ───────────────────────────────────────────────────────
 
 export function FactoryFloor() {
-  const { config, stats } = useFactoryData();
+  const { config, stats, loading } = useFactoryData();
   const { buildingFilter, zoom, setZoom, viewMode } = useFactoryStore();
 
   const visibleBuildings =
@@ -31,7 +32,11 @@ export function FactoryFloor() {
       <FilterBar stats={stats} config={config} />
 
       {/* Canvas */}
-      {viewMode === '3d' ? (
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center text-white/50">
+           Loading factory layout...
+        </div>
+      ) : viewMode === '3d' ? (
         <Factory3DView />
       ) : viewMode === 'pseudo3d' ? (
         <FactoryPseudo3DView />
@@ -43,8 +48,8 @@ export function FactoryFloor() {
             style={{ transformOrigin: 'top left' }}
             className="p-5 space-y-6 min-w-max"
           >
-            {visibleBuildings.map((building, idx) => (
-              <Building key={building.id} building={building} buildingIndex={idx} />
+            {config.buildings[0]?.floors[0]?.rooms[0]?.lines.map((line, idx) => (
+              <ProductionLine key={line.id} line={line} lineIndex={idx} />
             ))}
           </motion.div>
         </div>
@@ -193,26 +198,6 @@ function FilterBar({ stats, config }: { stats: FactoryStats; config: FactoryConf
         })}
       </div>
 
-      {/* Divider */}
-      <div className="w-px h-4 bg-white/[0.08]" />
-
-      {/* Building filter */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] text-white/20 mr-1">Building</span>
-        <FilterChip
-          active={buildingFilter === 'all'}
-          onClick={() => setBuildingFilter('all')}
-          label="All"
-        />
-        {config.buildings.map((b) => (
-          <FilterChip
-            key={b.id}
-            active={buildingFilter === b.id}
-            onClick={() => setBuildingFilter(b.id)}
-            label={b.name}
-          />
-        ))}
-      </div>
     </div>
   );
 }

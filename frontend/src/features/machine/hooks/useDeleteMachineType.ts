@@ -11,6 +11,7 @@ export function useDeleteMachineType() {
       toast.success('Machine Type deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['machineTypes'] });
       queryClient.invalidateQueries({ queryKey: ['machineTypes', id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to delete machine type');

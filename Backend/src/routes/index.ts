@@ -10,8 +10,9 @@ import terminalRoutes from "../modules/terminal/routes/terminal.routes";
 import attendanceRoutes from "../modules/attendance/routes/attendance.routes";
 import productionOrderRoutes from "../modules/production-order/routes/production-order.routes";
 import bundleRoutes from "../modules/bundle/routes/bundle.routes";
-import bundleTransactionRoutes from "../modules/bundle-transaction/routes/bundle-transaction.routes";
-import qcRoutes from "../modules/qc/routes/qc.routes";
+import floorRoutes from "../modules/floor/routes/floor.routes";
+import roomRoutes from "../modules/room/routes/room.routes";
+
 import { dashboardRoutes } from "../modules/dashboard/routes/dashboard.routes";
 import { reportsRoutes } from "../modules/reports/routes/reports.routes";
 import { planningRoutes } from "../modules/planning/routes/planning.routes";
@@ -32,8 +33,9 @@ router.use("/terminals", terminalRoutes);
 router.use("/attendance", attendanceRoutes);
 router.use("/production-orders", productionOrderRoutes);
 router.use("/bundles", bundleRoutes);
-router.use("/bundle-transactions", bundleTransactionRoutes);
-router.use("/qc", qcRoutes);
+router.use("/floors", floorRoutes);
+router.use("/rooms", roomRoutes);
+
 router.use("/dashboard", dashboardRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/planning", planningRoutes);

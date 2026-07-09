@@ -54,6 +54,10 @@ export class WorkerRepository {
             include: {
               skill: true
             }
+          },
+          assignments: {
+            where: { status: "ACTIVE" },
+            include: { machine: true, operation: true }
           }
         }
       })
@@ -77,6 +81,10 @@ export class WorkerRepository {
           include: {
             skill: true
           }
+        },
+        assignments: {
+          where: { status: "ACTIVE" },
+          include: { machine: true, operation: true }
         }
       }
     });

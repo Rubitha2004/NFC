@@ -9,6 +9,9 @@ export const createMachineSchema = z.object({
   terminalId: z.number().int().positive("Terminal ID must be a positive number"),
   status: z.nativeEnum(RecordStatus).optional(),
   remarks: z.string().optional(),
+  roomId: z.number().int().optional().nullable(),
+  rowIndex: z.number().int().optional().nullable(),
+  positionIndex: z.number().int().optional().nullable(),
 });
 
 export const updateMachineSchema = z.object({
@@ -17,8 +20,17 @@ export const updateMachineSchema = z.object({
   machineTypeId: z.number().int().positive().optional(),
   terminalId: z.number().int().positive().optional(),
   remarks: z.string().optional(),
+  roomId: z.number().int().optional().nullable(),
+  rowIndex: z.number().int().optional().nullable(),
+  positionIndex: z.number().int().optional().nullable(),
 });
 
 export const changeMachineStatusSchema = z.object({
   status: z.nativeEnum(RecordStatus, { message: "Status is required" }),
+});
+
+export const assignMachineRoomSchema = z.object({
+  roomId: z.number().int().nullable(),
+  rowIndex: z.number().int().nullable(),
+  positionIndex: z.number().int().nullable(),
 });

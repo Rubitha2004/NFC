@@ -8,14 +8,40 @@ export class ProductionOrderRepository {
 
   async findAll() {
     return prisma.productionOrder.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        productionTasks: {
+          select: { 
+            workerId: true, 
+            machineId: true,
+            worker: { select: { firstName: true, lastName: true, employeeCode: true } },
+            machine: { select: { machineName: true, machineCode: true } }
+          }
+        },
+        _count: {
+          select: { bundles: true }
+        }
+      }
     });
   }
 
   async findById(id: number) {
     return prisma.productionOrder.findUnique({
       where: { id },
-      include: { bundles: true }
+      include: { 
+        bundles: true,
+        productionTasks: {
+          select: { 
+            workerId: true, 
+            machineId: true,
+            worker: { select: { firstName: true, lastName: true, employeeCode: true } },
+            machine: { select: { machineName: true, machineCode: true } }
+          }
+        },
+        _count: {
+          select: { bundles: true }
+        }
+      }
     });
   }
 

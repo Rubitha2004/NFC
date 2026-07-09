@@ -12,6 +12,7 @@ export function useUpdateAssignment() {
       toast.success('Assignment updated successfully');
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       queryClient.invalidateQueries({ queryKey: ['assignments', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to update assignment');

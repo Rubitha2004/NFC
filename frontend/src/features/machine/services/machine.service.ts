@@ -9,6 +9,9 @@ export interface MachineAPIResponse {
   departmentId: number;
   machineTypeId: number;
   terminalId: number;
+  roomId?: number;
+  rowIndex?: number;
+  positionIndex?: number;
   status: string;
   department?: {
     id: number;
@@ -23,6 +26,27 @@ export interface MachineAPIResponse {
     name: string;
     terminalCode: string;
   };
+  assignments?: Array<{
+    id: number;
+    workerId: number;
+    machineId: number;
+    operationId?: number;
+    shiftId?: number;
+    assignedAt: string;
+    status: string;
+    worker?: {
+      id: number;
+      firstName: string;
+      lastName: string;
+      employeeCode: string;
+    };
+    operation?: {
+      operationName: string;
+    };
+    shift?: {
+      name: string;
+    };
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -60,7 +84,7 @@ export const mapMachineAPIToUI = (data: MachineAPIResponse): MachineData => {
     floor: '1st',
     room: 'A',
     productionLine: 'Line 1',
-    status: (data.status?.toLowerCase() === 'active' ? 'running' : 'idle') as MachineStatus,
+    status: data.assignments && data.assignments.length > 0 ? 'running' : (data.status?.toLowerCase() === 'active' ? 'idle' : (data.status?.toLowerCase() as MachineStatus)),
     health: 'healthy' as MachineHealth,
     healthScore: 95,
     terminalId: data.terminal?.terminalCode || String(data.terminalId),
@@ -68,10 +92,19 @@ export const mapMachineAPIToUI = (data: MachineAPIResponse): MachineData => {
     runningHours: 0,
     temperature: 30,
     powerConsumption: 100,
-    lastHeartbeat: new Date().toISOString(),
+    currentAssignment: data.assignments && data.assignments.length > 0 ? {
+      workerId: data.assignments[0].worker?.employeeCode || String(data.assignments[0].workerId),
+      workerName: data.assignments[0].worker ? `${data.assignments[0].worker.firstName} ${data.assignments[0].worker.lastName}` : "Unknown Worker",
+      operation: data.assignments[0].operation?.operationName || "Unknown Operation",
+      assignedAt: data.assignments[0].assignedAt,
+      shift: data.assignments[0].shift?.name || "Morning"
+    } : undefined,
+    currentBundle: undefined,
     todayTarget: 0,
     todayCompleted: 0,
     efficiency: 0,
+    currentOperation: data.assignments && data.assignments.length > 0 ? (data.assignments[0].operation?.operationName || "Unknown Operation") : undefined,
+    lastHeartbeat: new Date().toISOString(),
     purchaseDate: data.createdAt,
     maintenanceHistory: [],
     productionHistory: [],
@@ -81,7 +114,7 @@ export const mapMachineAPIToUI = (data: MachineAPIResponse): MachineData => {
 
 export const machineService = {
   async getMachines() {
-    const { data } = await apiClient.get<{ success: boolean; data: { data: MachineAPIResponse[] } }>('/machines');
+    const { data } = await apiClient.get<{ success: boolean; data: { data: MachineAPIResponse[] } }>('/machines?limit=2000');
     return data.data.data.map(mapMachineAPIToUI);
   },
 
@@ -99,9 +132,9 @@ export const machineService = {
       machineName: machine.name,
       departmentId: DEPT_MAP[machine.department] || 1,
       machineTypeId: MACHINE_TYPE_MAP[machine.type] || 1,
-      // Need a terminal id, mocking to 1 if not provided or valid
       terminalId: machine.terminalId ? parseInt(machine.terminalId) || 1 : 1,
       status: 'ACTIVE',
+      ...(machine.room && machine.room !== "none" && { roomId: parseInt(machine.room) })
     };
     
     const { data } = await apiClient.post<{ success: boolean; data: MachineAPIResponse }>('/machines', payload);
@@ -130,6 +163,11 @@ export const machineService = {
     const { data } = await apiClient.patch<{ success: boolean; data: MachineAPIResponse }>(`/machines/${target.id}/status`, {
       status: 'INACTIVE'
     });
+    return data.data;
+  },
+
+  async assignRoom(id: number, assignmentData: { roomId: number | null, rowIndex: number | null, positionIndex: number | null }) {
+    const { data } = await apiClient.post<{ success: boolean; data: MachineAPIResponse }>(`/machines/${id}/assign-room`, assignmentData);
     return data.data;
   }
 };

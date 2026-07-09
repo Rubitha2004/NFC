@@ -26,6 +26,12 @@ export interface WorkerAPIResponse {
       name: string;
     }
   }>;
+  assignments?: Array<{
+    machine?: { machineCode: string };
+    operation?: { operationName: string };
+    machineId?: number;
+    operationId?: number;
+  }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,6 +65,11 @@ export const mapWorkerAPIToUI = (data: WorkerAPIResponse): WorkerData => {
     secondarySkills: data.skills && data.skills.length > 1 ? data.skills.slice(1).map(s => s.skill.name) : [],
     shift: 'Morning', // Mocked shift as it's not strictly on Worker model directly
     nfcCardId: data.nfcCardId || '',
+    currentAssignment: data.assignments && data.assignments.length > 0 ? {
+      machineId: data.assignments[0].machine?.machineCode || `MAC-${data.assignments[0].machineId}`,
+      operationName: data.assignments[0].operation?.operationName || 'Assigned Operation',
+      status: 'active'
+    } : undefined,
     joiningDate: new Date(data.createdAt),
     status: (data.status?.toLowerCase() || 'active') as WorkerStatus,
     createdAt: new Date(data.createdAt),
@@ -73,7 +84,7 @@ export const mapWorkerAPIToUI = (data: WorkerAPIResponse): WorkerData => {
 
 export const workerService = {
   async getWorkers() {
-    const { data } = await apiClient.get<{ success: boolean; data: { data: WorkerAPIResponse[] } }>('/workers');
+    const { data } = await apiClient.get<{ success: boolean; data: { data: WorkerAPIResponse[] } }>('/workers?limit=2000');
     return data.data.data.map(mapWorkerAPIToUI);
   },
 

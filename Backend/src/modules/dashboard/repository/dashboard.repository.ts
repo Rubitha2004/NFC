@@ -42,12 +42,8 @@ export class DashboardRepository {
       prisma.productionOrder.findMany({
         where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } }
       }),
-      prisma.bundleTransaction.aggregate({
-        _sum: { quantity: true },
-        where: {
-          transactionTime: { gte: startOfToday },
-          transactionType: 'COMPLETE'
-        }
+      prisma.bundleStageLog.count({
+        where: { outTime: { gte: startOfToday } }
       }),
 
       // Bundle summary metrics
@@ -75,7 +71,7 @@ export class DashboardRepository {
       totalMachines,
       offlineTerminals,
       productionOrders,
-      todaysCompletedQuantity: todaysTransactions._sum.quantity || 0,
+      todaysCompletedQuantity: todaysTransactions,
       bundlesGrouped,
       qcAggregate
     };

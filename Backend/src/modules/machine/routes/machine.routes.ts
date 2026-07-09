@@ -9,5 +9,6 @@ router.get("/", controller.getAll);
 router.get("/:id", controller.getById);
 router.put("/:id", controller.update);
 router.patch("/:id/status", controller.changeStatus);
+router.post("/:id/assign-room", controller.assignRoom);
 
 export default router;

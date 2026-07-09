@@ -14,10 +14,6 @@ export type GeneralSettingsFormValues = z.infer<typeof generalSettingsSchema>;
 
 export const factorySettingsSchema = z.object({
   factoryName: z.string().min(2),
-  buildings: z.number().min(1),
-  floors: z.number().min(1),
-  rooms: z.number().min(1),
-  productionLines: z.number().min(1),
   defaultShift: z.string(),
 });
 export type FactorySettingsFormValues = z.infer<typeof factorySettingsSchema>;

@@ -42,14 +42,12 @@ import {
 import type { NavItem } from "@/shared/types";
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Planning Center", icon: CalendarDays, path: "/planning/center" },
-  { label: "Planning Dashboard", icon: BarChart3, path: "/planning/dashboard" },
+  { label: "Planning Dashboard", icon: LayoutDashboard, path: "/planning/center" },
   { label: "Planning Board", icon: Kanban, path: "/planning/board" },
   { label: "Resource Allocation", icon: Map, path: "/planning/resources" },
-  { label: "Production Timeline", icon: History, path: "/planning/timeline" },
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Production Orders", icon: FileText, path: "/production-orders" },
   { label: "Live Factory", icon: Factory, path: "/live-factory" },
+  { label: "Factory Layout", icon: Map, path: "/factory-layout" },
   { label: "Departments", icon: Building2, path: "/departments" },
   { label: "Workers", icon: Users, path: "/workers" },
   { label: "Machines", icon: Cog, path: "/machines" },

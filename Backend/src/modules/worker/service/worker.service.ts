@@ -2,6 +2,7 @@ import { WorkerRepository } from "../repository/worker.repository";
 import { CreateWorkerDto, UpdateWorkerDto } from "../dto/worker.dto";
 import { WorkerSearchParams } from "../types/worker.types";
 import { RecordStatus } from "@prisma/client";
+import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
 
 export class WorkerService {
   private repository: WorkerRepository;
@@ -35,7 +36,9 @@ export class WorkerService {
       throw new Error("Grade does not exist");
     }
 
-    return await this.repository.create(data);
+    const worker = await this.repository.create(data);
+    websocketService.publish(WEBSOCKET_EVENTS.WORKER_CREATED, worker);
+    return worker;
   }
 
   async getAll(params: WorkerSearchParams) {
@@ -85,7 +88,9 @@ export class WorkerService {
       }
     }
 
-    return await this.repository.update(id, data);
+    const updatedWorker = await this.repository.update(id, data);
+    websocketService.publish(WEBSOCKET_EVENTS.WORKER_UPDATED, updatedWorker);
+    return updatedWorker;
   }
 
   async changeStatus(id: number, status: RecordStatus) {
@@ -93,6 +98,18 @@ export class WorkerService {
     if (!worker) {
       throw new Error("Worker not found");
     }
-    return await this.repository.changeStatus(id, status);
+    const updatedWorker = await this.repository.changeStatus(id, status);
+    
+    // Logic Fix: Auto-release active assignments if worker is deactivated
+    if (status === 'INACTIVE') {
+      const prisma = require("../../../config/prisma").default;
+      await prisma.assignment.updateMany({
+        where: { workerId: id, status: 'ACTIVE' },
+        data: { status: 'COMPLETED', releasedAt: new Date() }
+      });
+    }
+
+    websocketService.publish(WEBSOCKET_EVENTS.WORKER_STATUS_CHANGED, updatedWorker);
+    return updatedWorker;
   }
 }

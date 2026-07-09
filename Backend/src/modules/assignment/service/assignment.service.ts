@@ -1,3 +1,4 @@
+import prisma from "../../../config/prisma";
 import { AssignmentRepository } from "../repository/assignment.repository";
 import { CreateAssignmentDto, UpdateAssignmentDto, AssignmentSearchParams } from "../types/assignment.types";
 import { WorkerRepository } from "../../worker/repository/worker.repository";
@@ -23,59 +24,66 @@ export class AssignmentService {
   }
 
   async createAssignment(data: CreateAssignmentDto) {
-    const { workerId, machineId, operationId, shiftId, assignedBy, remarks } = data;
+    return prisma.$transaction(async (tx) => {
+      const [worker, machine, operation, shift] = await Promise.all([
+        tx.worker.findUnique({ where: { id: data.workerId } }),
+        tx.machine.findUnique({ where: { id: data.machineId } }),
+        tx.operation.findUnique({ where: { id: data.operationId }, include: { requiredSkill: true } }),
+        tx.shift.findUnique({ where: { id: data.shiftId } }),
+      ]);
 
-    // 1. Verify all entities exist and are active
-    const worker = await this.workerRepo.findById(workerId);
-    if (!worker || worker.status !== RecordStatus.ACTIVE) {
-      throw new Error("Worker not found or not active");
-    }
+      if (!worker || worker.status !== RecordStatus.ACTIVE) throw new Error("Worker not found or not active");
+      if (!machine || machine.status !== RecordStatus.ACTIVE) throw new Error("Machine not found or not active");
+      if (!operation || operation.status !== RecordStatus.ACTIVE) throw new Error("Operation not found or not active");
+      if (!shift || shift.status !== RecordStatus.ACTIVE) throw new Error("Shift not found or not active");
 
-    const machine = await this.machineRepo.findById(machineId);
-    if (!machine || machine.status !== RecordStatus.ACTIVE) {
-      throw new Error("Machine not found or not active");
-    }
+      if (operation.requiredSkillId) {
+        const hasSkill = await tx.workerSkill.findUnique({
+          where: { workerId_skillId: { workerId: data.workerId, skillId: operation.requiredSkillId } }
+        });
+        if (!hasSkill) {
+          throw new Error(
+            `Worker does not have the required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`
+          );
+        }
+      }
 
-    const operation = await this.operationRepo.findById(operationId);
-    if (!operation || operation.status !== RecordStatus.ACTIVE) {
-      throw new Error("Operation not found or not active");
-    }
+      // reject if machine already occupied THIS shift — locked inside the same tx
+      const machineBusy = await tx.assignment.findFirst({
+        where: { machineId: data.machineId, shiftId: data.shiftId, status: AssignmentStatus.ACTIVE }
+      });
+      if (machineBusy) throw new Error("Machine is already assigned in this shift");
 
-    const shift = await this.shiftRepo.findById(shiftId);
-    if (!shift || shift.status !== RecordStatus.ACTIVE) {
-      throw new Error("Shift not found or not active");
-    }
+      // release worker's existing active assignment
+      await tx.assignment.updateMany({
+        where: { workerId: data.workerId, status: AssignmentStatus.ACTIVE },
+        data: { status: AssignmentStatus.COMPLETED, releasedAt: new Date() }
+      });
 
-    // 2. Worker Reassignment logic:
-    // If worker moves to a new machine, automatically release the old assignment
-    const existingWorkerAssignment = await this.assignmentRepo.findActiveWorkerAssignment(workerId, shiftId);
-    
-    if (existingWorkerAssignment) {
-      // Release it
-      await this.assignmentRepo.releaseAssignment(existingWorkerAssignment.id);
-    }
+      const assignment = await tx.assignment.create({
+        data: {
+          workerId: data.workerId,
+          machineId: data.machineId,
+          operationId: data.operationId,
+          shiftId: data.shiftId,
+          assignedBy: data.assignedBy,
+          remarks: data.remarks,
+          status: AssignmentStatus.ACTIVE,
+        }
+      });
 
-    // 3. Machine availability logic:
-    // One machine can have only one active worker in a shift. Option 1: Reject if occupied.
-    const existingMachineAssignment = await this.assignmentRepo.findActiveMachineAssignment(machineId, shiftId);
-    if (existingMachineAssignment) {
-      throw new Error("Machine is already assigned to another worker in this shift");
-    }
-
-    // 4. Create new Assignment
-    const assignment = await this.assignmentRepo.create({
-      workerId,
-      machineId,
-      operationId,
-      shiftId,
-      assignedBy,
-      remarks,
-      status: AssignmentStatus.ACTIVE,
+      return assignment;
+    }, { isolationLevel: "Serializable" })
+    .then((assignment) => {
+      websocketService.publish(WEBSOCKET_EVENTS.ASSIGNMENT_CREATED, assignment);
+      return assignment;
+    })
+    .catch((error: any) => {
+      if (error.code === 'P2034') {
+        throw new Error("Transaction conflict occurred. Please retry.");
+      }
+      throw error;
     });
-
-    websocketService.publish(WEBSOCKET_EVENTS.ASSIGNMENT_CREATED, assignment);
-
-    return assignment;
   }
 
   async getAllAssignments(params: AssignmentSearchParams) {

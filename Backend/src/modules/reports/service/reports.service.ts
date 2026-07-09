@@ -49,14 +49,14 @@ export class ReportsService {
     const workerGroups = await this.repository.getWorkerReport(params);
     
     // Enhance with worker details
-    const workerIds = workerGroups.map(w => w.toWorkerId).filter(id => id !== null) as number[];
+    const workerIds = workerGroups.map(w => w.operatorId).filter(id => id !== null) as number[];
     const details = await this.repository.getWorkerDetails(workerIds);
     const workerMap = new Map(details.map(w => [w.id, w]));
 
     const enrichedData = workerGroups.map((g: any) => ({
-      workerId: g.toWorkerId,
-      workerName: g.toWorkerId ? `${workerMap.get(g.toWorkerId)?.firstName || ''} ${workerMap.get(g.toWorkerId)?.lastName || ''}` : 'Unknown',
-      department: g.toWorkerId ? workerMap.get(g.toWorkerId)?.department?.name || 'N/A' : 'N/A',
+      workerId: g.operatorId,
+      workerName: g.operatorId ? `${workerMap.get(g.operatorId)?.firstName || ''} ${workerMap.get(g.operatorId)?.lastName || ''}` : 'Unknown',
+      department: g.operatorId ? workerMap.get(g.operatorId)?.department?.name || 'N/A' : 'N/A',
       totalProduced: g._sum.quantity || 0,
       transactionsCount: g._count.id
     }));
@@ -69,16 +69,16 @@ export class ReportsService {
   async getMachineAnalytics(params: ReportSearchParams) {
     const machineGroups = await this.repository.getMachineReport(params);
     
-    const machineIds = machineGroups.map(m => m.toMachineId).filter(id => id !== null) as number[];
+    const machineIds = machineGroups.map((m: any) => m.machineId).filter((id: any) => id !== null) as number[];
     const details = await this.repository.getMachineDetails(machineIds);
     const machineMap = new Map(details.map(m => [m.id, m]));
 
     const enrichedData = machineGroups.map((g: any) => ({
-      machineId: g.toMachineId,
-      machineCode: g.toMachineId ? machineMap.get(g.toMachineId)?.machineCode || 'Unknown' : 'Unknown',
-      machineName: g.toMachineId ? machineMap.get(g.toMachineId)?.machineName || 'Unknown' : 'Unknown',
-      totalProduced: g._sum.quantity || 0,
-      transactionsCount: g._count.id
+      machineId: g.machineId,
+      machineCode: g.machineId ? machineMap.get(g.machineId)?.machineCode || 'Unknown' : 'Unknown',
+      machineName: g.machineId ? machineMap.get(g.machineId)?.machineName || 'Unknown' : 'Unknown',
+      totalProduced: g._sum?.quantity || 0,
+      transactionsCount: g._count?.id || 0
     }));
 
     return {
@@ -91,9 +91,9 @@ export class ReportsService {
     
     const summary = {
       totalInspections: qcRecords.length,
-      totalPass: qcRecords.reduce((acc, q) => acc + q.passQuantity, 0),
-      totalReject: qcRecords.reduce((acc, q) => acc + q.rejectQuantity, 0),
-      totalRework: qcRecords.reduce((acc, q) => acc + q.reworkQuantity, 0),
+      totalPass: qcRecords.reduce((acc, q) => acc + (q.status === 'PASS' ? q.bundle.quantity : 0), 0),
+      totalReject: qcRecords.reduce((acc, q) => acc + (q.status === 'FAIL' ? q.bundle.quantity : 0), 0),
+      totalRework: qcRecords.reduce((acc, q) => acc + (q.status === 'REWORK' ? q.bundle.quantity : 0), 0),
       defectRate: 0
     };
 

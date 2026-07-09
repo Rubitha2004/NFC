@@ -11,6 +11,7 @@ export function useCreateMachineType() {
     onSuccess: () => {
       toast.success('Machine Type created successfully');
       queryClient.invalidateQueries({ queryKey: ['machineTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to create machine type');

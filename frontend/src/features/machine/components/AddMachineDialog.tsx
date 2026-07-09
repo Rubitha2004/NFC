@@ -1,3 +1,4 @@
+import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { machineFormSchema, type MachineFormData } from "../types/machine.types";
@@ -29,6 +30,9 @@ import {
 import { Save, Cpu, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+import { roomService } from "@/features/factory-layout/services/room.service";
+import type { Room } from "@/features/factory-layout/types/factory-layout.types";
+
 const MACHINE_TYPES = [
   "Single Needle",
   "Double Needle",
@@ -43,9 +47,6 @@ const MACHINE_TYPES = [
 ] as const;
 
 const DEPARTMENTS = ["Stitching", "Cutting", "Finishing", "Packing", "Embroidery"];
-const BUILDINGS = ["Block-A", "Block-B", "Block-C"];
-const FLOORS = ["Ground", "First", "Second"];
-const LINES = ["Line-1", "Line-2", "Line-3", "Line-4"];
 const STATUSES = ["running", "idle", "offline", "maintenance", "error"] as const;
 
 // Base UI Select passes `string | null` — coerce null → "" for react-hook-form
@@ -56,6 +57,13 @@ function sv(setter: (v: string) => void) {
 export function AddMachineDialog() {
   const store = useMachineStore();
   const createMachineMutation = useCreateMachine();
+  const [rooms, setRooms] = React.useState<Room[]>([]);
+
+  React.useEffect(() => {
+    if (store.isAddDialogOpen) {
+      roomService.getAll().then(setRooms).catch(console.error);
+    }
+  }, [store.isAddDialogOpen]);
 
   const form = useForm<MachineFormData>({
     resolver: zodResolver(machineFormSchema) as any,
@@ -202,80 +210,25 @@ export function AddMachineDialog() {
               <p className="text-[10px] uppercase tracking-widest text-white/30 font-bold mb-3">
                 Location
               </p>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="building"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/70 text-xs">Building</FormLabel>
-                      <Select onValueChange={sv(field.onChange)} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="bg-zinc-900 border-white/10 h-10">
-                            <SelectValue placeholder="Select building" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {BUILDINGS.map((b) => (
-                            <SelectItem key={b} value={b}>{b}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="floor"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/70 text-xs">Floor</FormLabel>
-                      <Select onValueChange={sv(field.onChange)} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="bg-zinc-900 border-white/10 h-10">
-                            <SelectValue placeholder="Select floor" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {FLOORS.map((f) => (
-                            <SelectItem key={f} value={f}>{f}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="room"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-white/70 text-xs">Room</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="R-01"
-                          className="bg-zinc-900 border-white/10 h-10"
-                          {...field}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="productionLine"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-white/70 text-xs">Production Line</FormLabel>
-                      <Select onValueChange={sv(field.onChange)} defaultValue={field.value}>
+                      <FormLabel className="text-white/70 text-xs">Assign Room</FormLabel>
+                      <Select onValueChange={sv(field.onChange)} value={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-zinc-900 border-white/10 h-10">
-                            <SelectValue placeholder="Select line" />
+                            <SelectValue placeholder="Select a room (optional)" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {LINES.map((l) => (
-                            <SelectItem key={l} value={l}>{l}</SelectItem>
+                          <SelectItem value="none">None (Assign later)</SelectItem>
+                          {rooms.map((r) => (
+                            <SelectItem key={r.id} value={String(r.id)}>
+                              {r.name} (Floor {r.floor?.floorNumber})
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

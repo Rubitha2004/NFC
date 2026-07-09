@@ -20,6 +20,7 @@ export function useUpdateDepartment() {
       queryClient.invalidateQueries({
         queryKey: [DEPARTMENTS_QUERY_KEY, 'detail', variables.id],
       });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
       toast.success('Department updated successfully');
     },
 

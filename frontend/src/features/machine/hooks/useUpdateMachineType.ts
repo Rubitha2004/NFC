@@ -13,6 +13,7 @@ export function useUpdateMachineType() {
       toast.success('Machine Type updated successfully');
       queryClient.invalidateQueries({ queryKey: ['machineTypes'] });
       queryClient.invalidateQueries({ queryKey: ['machineTypes', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to update machine type');

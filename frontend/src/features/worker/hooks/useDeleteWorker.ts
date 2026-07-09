@@ -11,6 +11,7 @@ export function useDeleteWorker() {
       toast.success('Worker deleted successfully');
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       queryClient.invalidateQueries({ queryKey: ['workers', id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to delete worker');

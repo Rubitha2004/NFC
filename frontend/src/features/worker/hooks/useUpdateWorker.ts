@@ -13,6 +13,7 @@ export function useUpdateWorker() {
       toast.success('Worker updated successfully');
       queryClient.invalidateQueries({ queryKey: ['workers'] });
       queryClient.invalidateQueries({ queryKey: ['workers', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to update worker');

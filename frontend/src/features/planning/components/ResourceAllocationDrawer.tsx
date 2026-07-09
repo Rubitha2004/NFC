@@ -8,10 +8,13 @@ interface ResourceAllocationDrawerProps {
   onClose: () => void;
   operationName: string;
   requiredMinutes: number;
+  requiredSkillId?: number | null;
   availableWorkers: PlanningWorker[];
   availableMachines: PlanningMachine[];
   selectedWorkerIds: number[];
   selectedMachineIds: number[];
+  allSelectedWorkerIds?: number[];
+  allSelectedMachineIds?: number[];
   onSelectWorker: (id: number) => void;
   onSelectMachine: (id: number) => void;
 }
@@ -21,10 +24,13 @@ export function ResourceAllocationDrawer({
   onClose,
   operationName,
   requiredMinutes,
+  requiredSkillId,
   availableWorkers,
   availableMachines,
   selectedWorkerIds,
   selectedMachineIds,
+  allSelectedWorkerIds = [],
+  allSelectedMachineIds = [],
   onSelectWorker,
   onSelectMachine,
 }: ResourceAllocationDrawerProps) {
@@ -33,15 +39,33 @@ export function ResourceAllocationDrawer({
   const [showOnlyFree, setShowOnlyFree] = useState(false);
 
   const groupedWorkers = useMemo(() => {
-    let filtered = availableWorkers;
-    if (showOnlyFree) {
-      filtered = filtered.filter(w => w.assignments.length === 0);
-    }
-    
+    let filtered = availableWorkers || [];
+
     filtered = filtered.filter(w => 
-      w.firstName.toLowerCase().includes(search.toLowerCase()) || 
-      w.employeeCode.toLowerCase().includes(search.toLowerCase())
-    ).sort((a, b) => b.grade.priority - a.grade.priority);
+      (w.firstName || "").toLowerCase().includes(search.toLowerCase()) || 
+      (w.employeeCode || "").toLowerCase().includes(search.toLowerCase())
+    ).sort((a, b) => {
+      const hasReqSkillA = requiredSkillId ? (a as any).skills?.some((s: any) => s.skillId === requiredSkillId) : false;
+      const hasReqSkillB = requiredSkillId ? (b as any).skills?.some((s: any) => s.skillId === requiredSkillId) : false;
+      
+      const isBusyA = (a.assignments?.length || 0) > 0 || allSelectedWorkerIds.includes(a.id);
+      const isBusyB = (b.assignments?.length || 0) > 0 || allSelectedWorkerIds.includes(b.id);
+      
+      // 1. Skill Match Priority
+      if (hasReqSkillA && !hasReqSkillB) return -1;
+      if (!hasReqSkillA && hasReqSkillB) return 1;
+      
+      // 2. Free Priority
+      if (!isBusyA && isBusyB) return -1;
+      if (isBusyA && !isBusyB) return 1;
+      
+      // 3. Grade Priority
+      return (b.grade?.priority || 0) - (a.grade?.priority || 0);
+    });
+
+    if (showOnlyFree) {
+      filtered = filtered.filter(w => !((w.assignments?.length || 0) > 0 || allSelectedWorkerIds.includes(w.id)));
+    }
 
     // Group by department name
     const grouped: Record<string, typeof filtered> = {};
@@ -51,28 +75,36 @@ export function ResourceAllocationDrawer({
       grouped[dept].push(w);
     });
     return grouped;
-  }, [availableWorkers, search, showOnlyFree]);
+  }, [availableWorkers, search, showOnlyFree, requiredSkillId, allSelectedWorkerIds]);
 
   const groupedMachines = useMemo(() => {
-    let filtered = availableMachines;
+    let filtered = availableMachines || [];
     if (showOnlyFree) {
-      filtered = filtered.filter(m => m.assignments.length === 0);
+      filtered = filtered.filter(m => !((m.assignments?.length || 0) > 0 || allSelectedMachineIds.includes(m.id)));
     }
 
     filtered = filtered.filter(m => 
-      m.machineName.toLowerCase().includes(search.toLowerCase()) || 
-      m.machineCode.toLowerCase().includes(search.toLowerCase())
+      (m.machineName || "").toLowerCase().includes(search.toLowerCase()) || 
+      (m.machineCode || "").toLowerCase().includes(search.toLowerCase())
     );
 
-    // Group by department name
+    // Group by room, row, and department name
     const grouped: Record<string, typeof filtered> = {};
     filtered.forEach(m => {
       const dept = m.department?.name || "Unassigned Dept";
-      if (!grouped[dept]) grouped[dept] = [];
-      grouped[dept].push(m);
+      const roomName = m.room?.name;
+      const rowName = m.rowIndex ? `Row ${m.rowIndex}` : "";
+      
+      let groupKey = dept;
+      if (roomName) {
+        groupKey = `${roomName}${rowName ? ` - ${rowName}` : ''} (${dept})`;
+      }
+      
+      if (!grouped[groupKey]) grouped[groupKey] = [];
+      grouped[groupKey].push(m);
     });
     return grouped;
-  }, [availableMachines, search, showOnlyFree]);
+  }, [availableMachines, search, showOnlyFree, allSelectedMachineIds]);
 
   if (!isOpen) return null;
 
@@ -98,7 +130,7 @@ export function ResourceAllocationDrawer({
               tab === 'workers' ? "border-b-2 border-emerald-500 text-emerald-400 bg-emerald-500/5" : "text-white/50 hover:bg-white/5"
             )}
           >
-            <Users className="w-4 h-4" /> Workers ({selectedWorkerIds.length})
+            <Users className="w-4 h-4" /> Workers ({selectedWorkerIds?.length || 0})
           </button>
           <button 
             onClick={() => setTab('machines')}
@@ -107,7 +139,7 @@ export function ResourceAllocationDrawer({
               tab === 'machines' ? "border-b-2 border-blue-500 text-blue-400 bg-blue-500/5" : "text-white/50 hover:bg-white/5"
             )}
           >
-            <Cpu className="w-4 h-4" /> Machines ({selectedMachineIds.length})
+            <Cpu className="w-4 h-4" /> Machines ({selectedMachineIds?.length || 0})
           </button>
         </div>
 
@@ -125,7 +157,7 @@ export function ResourceAllocationDrawer({
           <button 
             onClick={() => setShowOnlyFree(!showOnlyFree)}
             className={cn(
-              "flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors",
+              "flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors shrink-0",
               showOnlyFree ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50" : "bg-zinc-900 border-white/10 text-white/60 hover:bg-white/5"
             )}
           >
@@ -143,8 +175,11 @@ export function ResourceAllocationDrawer({
                   <Layers className="w-4 h-4 text-white/40" /> {deptName}
                 </div>
                 {workers.map(worker => {
-                  const isSelected = selectedWorkerIds.includes(worker.id);
-                  const isBusy = worker.assignments.length > 0;
+                  const isSelected = selectedWorkerIds?.includes(worker.id);
+                  const isBusy = (worker.assignments?.length || 0) > 0 || allSelectedWorkerIds.includes(worker.id);
+                  const hasRequiredSkill = requiredSkillId 
+                    ? (worker as any).skills?.some((s: any) => s.skillId === requiredSkillId) 
+                    : false;
 
                   return (
                     <div 
@@ -165,7 +200,12 @@ export function ResourceAllocationDrawer({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-sm truncate">{worker.firstName} {worker.lastName}</span>
-                          <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 shrink-0">{worker.grade.name}</span>
+                          <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 shrink-0">{worker.grade?.name || "No Grade"}</span>
+                          {hasRequiredSkill && (
+                            <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded shrink-0 border border-purple-500/30">
+                              Skilled
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs mt-1 flex items-center gap-3">
                           <span className="text-white/40">{worker.employeeCode}</span>
@@ -192,8 +232,8 @@ export function ResourceAllocationDrawer({
                   <Layers className="w-4 h-4 text-white/40" /> {deptName}
                 </div>
                 {machines.map(machine => {
-                  const isSelected = selectedMachineIds.includes(machine.id);
-                  const isBusy = machine.assignments.length > 0;
+                  const isSelected = selectedMachineIds?.includes(machine.id);
+                  const isBusy = (machine.assignments?.length || 0) > 0 || allSelectedMachineIds.includes(machine.id);
 
                   return (
                     <div 
@@ -214,7 +254,7 @@ export function ResourceAllocationDrawer({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-sm truncate">{machine.machineName}</span>
-                          <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 shrink-0">{machine.machineType.name}</span>
+                          <span className="text-[10px] bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 shrink-0">{machine.machineType?.name || "No Type"}</span>
                         </div>
                         <div className="text-xs mt-1 flex items-center gap-3">
                           <span className="text-white/40">{machine.machineCode}</span>

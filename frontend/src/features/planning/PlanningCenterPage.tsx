@@ -1,21 +1,25 @@
 import { useState, useMemo } from "react";
-import { Activity, Play, ArrowRight, Package, Settings2, Layers, Cog, CheckCircle, Wand2, Users, Cpu, ShieldAlert, CheckSquare } from "lucide-react";
+import { motion } from "framer-motion";
+import { Activity, Play, ArrowRight, Package, Settings2, Layers, Cog, CheckCircle, Wand2, Users, Cpu, ShieldAlert, CheckSquare, Clock } from "lucide-react";
 import { useProductionOrders } from "../production-order/hooks/useProductionOrderData";
-import { usePlanningResources } from "./hooks/usePlanning";
+import { useLivePlanningResources } from "./hooks/useLivePlanningResources";
 import { useOperations } from "../operation/hooks/useOperations";
 import { usePlanningMutations } from "./hooks/usePlanningMutations";
+import { usePlanningDashboard } from "./hooks/usePlanning";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { OrderStatusBadge } from "../production-order/components/ProductionOrderUIHelpers";
+import type { OrderStatus } from "../production-order/types/production-order.types";
 import { CapacityGauge } from "./components/CapacityGauge";
 import { ResourceAllocationDrawer } from "./components/ResourceAllocationDrawer";
 import { BundleTagsModal } from "./components/BundleTagsModal";
 
 export default function PlanningCenterPage() {
   const { orders, isLoading: loadingOrders } = useProductionOrders();
-  const { data: resources, isLoading: loadingResources } = usePlanningResources();
+  const { data: resources, isLoading: loadingResources } = useLivePlanningResources();
   const { data: operations = [], isLoading: loadingOps } = useOperations();
   const { publishPlan } = usePlanningMutations();
+  const { data: metrics, isLoading: loadingMetrics } = usePlanningDashboard();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [bundlesCount, setBundlesCount] = useState<number>(1);
@@ -30,7 +34,8 @@ export default function PlanningCenterPage() {
   const [publishedOrderNumber, setPublishedOrderNumber] = useState<string>("");
 
   const pendingOrders = useMemo(() => {
-    return orders.filter(o => (o.status as string) === "PLANNED");
+    const targetStatus: OrderStatus = "planned";
+    return orders.filter(o => o.status === targetStatus);
   }, [orders]);
 
   const selectedOrder = useMemo(() => {
@@ -88,11 +93,10 @@ export default function PlanningCenterPage() {
     const newAssignments: Record<number, { workerIds: number[], machineIds: number[] }> = {};
     
     // Sort workers by grade priority (highest first) and try to stick to primary department
-    const sortedWorkers = [...resources.workers].sort((a, b) => b.grade.priority - a.grade.priority);
-    const availableWorkers = sortedWorkers.filter(w => w.assignments.length === 0);
-    const availableMachines = resources.machines.filter(m => m.assignments.length === 0);
+    const sortedWorkers = [...resources.workers].sort((a, b) => (b.grade?.priority || 0) - (a.grade?.priority || 0));
+    const availableWorkers = sortedWorkers.filter(w => (w.assignments?.length || 0) === 0);
+    const availableMachines = resources.machines.filter((m: any) => (m.assignments?.length || 0) === 0);
 
-    let workerIndex = 0;
     let machineIndex = 0;
 
     const activeOps = operations.filter(op => selectedOperations.has(Number(op.id)));
@@ -101,11 +105,20 @@ export default function PlanningCenterPage() {
       const requiredMinutes = Math.ceil(selectedOrder.targetQuantity * (op as any).smv);
       const requiredWorkers = Math.ceil(requiredMinutes / 480); // Assuming 8 hr shift
       
-      const wIds = [];
-      const mIds = [];
+      const wIds: number[] = [];
+      const mIds: number[] = [];
+      
+      // Filter available workers by required skill if applicable
+      const reqSkillId = (op as any).requiredSkillId;
+      const qualifiedWorkers = reqSkillId 
+        ? availableWorkers.filter(w => (w as any).skills?.some((s: any) => s.skillId === reqSkillId))
+        : availableWorkers;
 
       for(let i=0; i<requiredWorkers; i++) {
-        if(workerIndex < availableWorkers.length) wIds.push(availableWorkers[workerIndex++].id);
+        // We find the next available qualified worker
+        const nextWorker = qualifiedWorkers.find(w => !wIds.includes(w.id));
+        if(nextWorker) wIds.push(nextWorker.id);
+        
         if(machineIndex < availableMachines.length) mIds.push(availableMachines[machineIndex++].id);
       }
       
@@ -131,7 +144,7 @@ export default function PlanningCenterPage() {
     const assignmentArray: any[] = [];
     Object.entries(assignments).forEach(([opIdStr, alloc]) => {
       const opId = Number(opIdStr);
-      const count = Math.min(alloc.workerIds.length, alloc.machineIds.length);
+      const count = Math.min(alloc?.workerIds?.length || 0, alloc?.machineIds?.length || 0);
       for(let i = 0; i < count; i++) {
         assignmentArray.push({
           operationId: opId,
@@ -164,7 +177,7 @@ export default function PlanningCenterPage() {
     });
   };
 
-  const isLoading = loadingOrders || loadingResources || loadingOps;
+  const isLoading = loadingOrders || loadingResources || loadingOps || loadingMetrics;
   const isPublishing = publishPlan.isPending;
 
   if (isLoading) {
@@ -179,7 +192,80 @@ export default function PlanningCenterPage() {
   const activeOpReqMinutes = activeOp && selectedOrder ? Math.ceil(selectedOrder.targetQuantity * (activeOp as any).smv) : 0;
 
   return (
-    <div className="flex h-full bg-zinc-950 text-white overflow-hidden relative">
+    <div className="flex flex-col h-full bg-zinc-950 text-white overflow-hidden relative">
+      
+      {/* Dashboard Section */}
+      {metrics && (
+        <div className="flex-shrink-0 p-4 border-b border-white/10 bg-zinc-900/30">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Orders */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }} className="bg-zinc-900 border border-white/10 rounded-xl p-4 flex flex-col justify-between shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-white/70 uppercase tracking-wider">Orders</h3>
+                <Package className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="flex items-baseline space-x-2 mb-1">
+                <span className="text-2xl font-bold text-white">{metrics.orders.active}</span>
+                <span className="text-[10px] font-medium text-white/40 uppercase">Active</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-medium text-white/50 pt-1 border-t border-white/5 mt-1">
+                <span>Tot: {metrics.orders.total}</span>
+                <span className="text-emerald-500">Done: {metrics.orders.completed}</span>
+              </div>
+            </motion.div>
+
+            {/* Bundles */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-zinc-900 border border-white/10 rounded-xl p-4 flex flex-col justify-between shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-white/70 uppercase tracking-wider">Bundles</h3>
+                <Layers className="w-4 h-4 text-purple-500" />
+              </div>
+              <div className="flex items-baseline space-x-2 mb-1">
+                <span className="text-2xl font-bold text-white">{metrics.bundles.active}</span>
+                <span className="text-[10px] font-medium text-white/40 uppercase">Running</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-medium text-white/50 pt-1 border-t border-white/5 mt-1">
+                <span className="text-amber-500 flex items-center"><Clock className="w-3 h-3 mr-1" /> Wait: {metrics.bundles.waiting}</span>
+              </div>
+            </motion.div>
+
+            {/* Workers */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-zinc-900 border border-white/10 rounded-xl p-4 flex flex-col justify-between shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-white/70 uppercase tracking-wider">Workers</h3>
+                <Users className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="flex items-baseline space-x-2 mb-1">
+                <span className="text-2xl font-bold text-white">{metrics.workers.available}</span>
+                <span className="text-[10px] font-medium text-white/40 uppercase">Avail</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-medium text-white/50 pt-1 border-t border-white/5 mt-1">
+                <span>Tot: {metrics.workers.total}</span>
+                <span className="text-amber-500">Busy: {metrics.workers.busy}</span>
+              </div>
+            </motion.div>
+
+            {/* Machines */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-zinc-900 border border-white/10 rounded-xl p-4 flex flex-col justify-between shadow-md">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-medium text-white/70 uppercase tracking-wider">Machines</h3>
+                <Cpu className="w-4 h-4 text-rose-500" />
+              </div>
+              <div className="flex items-baseline space-x-2 mb-1">
+                <span className="text-2xl font-bold text-white">{metrics.machines.available}</span>
+                <span className="text-[10px] font-medium text-white/40 uppercase">Avail</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-medium text-white/50 pt-1 border-t border-white/5 mt-1">
+                <span>Tot: {metrics.machines.total}</span>
+                <span className="text-amber-500">Busy: {metrics.machines.busy}</span>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
       
       {/* Bundle Tags Modal */}
       <BundleTagsModal 
@@ -195,10 +281,13 @@ export default function PlanningCenterPage() {
         onClose={() => setActiveOperationId(null)}
         operationName={(activeOp as any)?.name || ""}
         requiredMinutes={activeOpReqMinutes}
+        requiredSkillId={(activeOp as any)?.requiredSkillId}
         availableWorkers={resources?.workers || []}
         availableMachines={resources?.machines || []}
         selectedWorkerIds={activeOperationId ? (assignments[activeOperationId]?.workerIds || []) : []}
         selectedMachineIds={activeOperationId ? (assignments[activeOperationId]?.machineIds || []) : []}
+        allSelectedWorkerIds={Object.values(assignments).flatMap(a => a.workerIds)}
+        allSelectedMachineIds={Object.values(assignments).flatMap(a => a.machineIds)}
         onSelectWorker={(wId) => activeOperationId && handleToggleWorker(activeOperationId, wId)}
         onSelectMachine={(mId) => activeOperationId && handleToggleMachine(activeOperationId, mId)}
       />
@@ -380,7 +469,7 @@ export default function PlanningCenterPage() {
                   {operations.filter(op => selectedOperations.has(Number(op.id))).map(op => {
                     const reqMins = Math.ceil(selectedOrder.targetQuantity * (op as any).smv);
                     const alloc = assignments[Number(op.id)] || { workerIds: [], machineIds: [] };
-                    const isMismatched = alloc.workerIds.length !== alloc.machineIds.length;
+                    const isMismatched = (alloc?.workerIds?.length || 0) !== (alloc?.machineIds?.length || 0);
                     
                     return (
                       <div key={op.id} className="bg-zinc-950 border border-white/5 rounded-xl p-4 flex items-center gap-6">
@@ -397,17 +486,17 @@ export default function PlanningCenterPage() {
                         <div className="w-2/5 flex items-center">
                            <CapacityGauge 
                              requiredMinutes={reqMins} 
-                             assignedWorkersCount={alloc.workerIds.length} 
+                             assignedWorkersCount={alloc?.workerIds?.length || 0} 
                            />
                         </div>
 
                         <div className="flex-1 flex justify-end items-center gap-4">
                           <div className="flex items-center gap-4 text-xs text-white/60">
                             <div className="flex items-center gap-1">
-                              <Users className="w-3 h-3 text-emerald-500" /> {alloc.workerIds.length}
+                              <Users className="w-3 h-3 text-emerald-500" /> {alloc?.workerIds?.length || 0}
                             </div>
                             <div className="flex items-center gap-1">
-                              <Cpu className="w-3 h-3 text-blue-500" /> {alloc.machineIds.length}
+                              <Cpu className="w-3 h-3 text-blue-500" /> {alloc?.machineIds?.length || 0}
                             </div>
                           </div>
                           
@@ -449,6 +538,7 @@ export default function PlanningCenterPage() {
             </p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

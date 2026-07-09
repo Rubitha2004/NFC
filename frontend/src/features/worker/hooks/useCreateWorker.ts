@@ -11,6 +11,7 @@ export function useCreateWorker() {
     onSuccess: () => {
       toast.success('Worker created successfully');
       queryClient.invalidateQueries({ queryKey: ['workers'] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to create worker');

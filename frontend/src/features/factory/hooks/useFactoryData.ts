@@ -1,34 +1,159 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FACTORY_CONFIG } from '../data/factory.mock';
 import type {
   FactoryConfig, FactoryStats, Machine, MachineStatus,
   MachineContext,
+  FactoryBuilding, FactoryFloorLevel, FactoryRoom, ProductionLine, RoomType
 } from '../types/factory.types';
-import { useDashboardOverview, useLiveFloor } from '../../dashboard/hooks/useDashboardQueries';
-import { buildFactoryHierarchy } from '../utils/autoLayoutEngine';
+import api from '@/services/axios';
+import { mapMachineAPIToUI } from '@/features/machine/services/machine.service';
 
-/**
- * Single data-access hook for the entire factory.
- * Swap the FACTORY_CONFIG import here for a React Query call — no component changes needed.
- */
 export function useFactoryData(): {
   config: FactoryConfig;
   stats: FactoryStats;
   allMachines: Machine[];
   getMachineById: (id: string) => Machine | undefined;
   getMachineContext: (id: string) => MachineContext | undefined;
+  loading: boolean;
 } {
-  const { data: overviewData } = useDashboardOverview();
-  const { data: liveFloorData } = useLiveFloor();
+  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState<FactoryConfig>(FACTORY_CONFIG);
 
-  const config = useMemo(() => {
-    if (liveFloorData) {
-      return buildFactoryHierarchy(liveFloorData);
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadData() {
+      try {
+        const [machinesRes] = await Promise.all([
+          api.get('/machines?limit=2000') // increased limit to support 420+ machines
+        ]);
+
+        if (!mounted) return;
+
+        const rawMachines = machinesRes.data.data?.data || machinesRes.data.data || [];
+
+        const mappedMachines = rawMachines.map((m: any, index: number) => {
+          const uiMachine = mapMachineAPIToUI(m);
+          
+          let worker: any = null;
+          let assignment: any = null;
+          
+          if (m.assignments && m.assignments.length > 0) {
+            const activeAssignment = m.assignments[0];
+            if (activeAssignment.worker) {
+               worker = {
+                 id: activeAssignment.worker.id.toString(),
+                 name: `${activeAssignment.worker.firstName} ${activeAssignment.worker.lastName}`,
+                 photo: undefined,
+                 role: 'Worker',
+                 department: uiMachine.department || 'General',
+                 employeeId: activeAssignment.worker.employeeCode,
+                 shiftId: activeAssignment.shiftId?.toString() || '1',
+                 grade: 'A',
+                 attendanceToday: 'present',
+                 checkInTime: new Date().toISOString()
+               };
+            }
+            assignment = {
+              id: activeAssignment.id.toString(),
+              workerId: activeAssignment.workerId.toString(),
+              machineId: activeAssignment.machineId.toString(),
+              operationId: activeAssignment.operationId?.toString() || '1',
+              operationName: 'Sewing', 
+              bundleId: '',
+              startedAt: activeAssignment.assignedAt,
+              targetPieces: 100,
+              completedPieces: 0
+            };
+          }
+
+          const factoryMachine: Machine = {
+            id: String(uiMachine.id),
+            machineNumber: uiMachine.machineId || m.machineCode || `M-${m.id}`,
+            machineType: String(uiMachine.type),
+            status: worker ? 'running' : ((uiMachine.status as any) === 'active' || uiMachine.status === 'running' ? 'no_worker' : 'idle'),
+            department: uiMachine.department || 'General',
+            worker,
+            assignment,
+            bundle: null,
+            healthScore: uiMachine.healthScore || 100,
+            uptimePercent: 99,
+            efficiency: uiMachine.efficiency || 0,
+            lastMaintenance: new Date().toISOString().split('T')[0],
+            nextMaintenanceDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+            temperatureC: uiMachine.temperature || 30,
+            powerStatus: 'on',
+            networkStatus: 'online',
+            todayTimeline: [],
+            position: { row: index % 2 === 0 ? 'bottom' : 'top', index }
+          };
+          
+          return factoryMachine;
+        });
+
+        // Build lines based on machines
+        const lines: ProductionLine[] = [];
+        const machinesPerRow = 35;
+        // Limit to exactly 4 rows as requested by the user
+        const totalRows = 4;
+        
+        for (let i = 0; i < totalRows; i++) {
+          lines.push({
+            id: `line-${i+1}`,
+            lineNumber: i + 1,
+            lineName: `Row ${i + 1}`,
+            machines: mappedMachines.slice(i * machinesPerRow, (i + 1) * machinesPerRow)
+          });
+        }
+
+        const factoryRoom: FactoryRoom = {
+          id: 'room-main',
+          name: 'Main Production Area',
+          roomType: 'stitching',
+          lines,
+        };
+
+        const factoryFloor: FactoryFloorLevel = {
+          id: 'floor-1',
+          floorNumber: 1,
+          name: 'Ground Floor',
+          rooms: [factoryRoom]
+        };
+
+        const building: FactoryBuilding = {
+          id: 'bldg-1',
+          name: 'Main Production Facility',
+          floors: [factoryFloor],
+        };
+
+        setConfig({
+          id: 'factory-1',
+          name: 'NFC Garment Production Facility',
+          location: 'Chennai, Tamil Nadu',
+          buildings: [building],
+          lastUpdated: new Date().toISOString()
+        });
+
+      } catch (err) {
+        console.error("Failed to load factory data", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
-    return FACTORY_CONFIG; // Fallback while loading
-  }, [liveFloorData]);
 
-  /** Flat list of every machine — traverses the full v2 hierarchy */
+    loadData();
+    
+    // Auto refresh every 10 seconds
+    const intervalId = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => { 
+      mounted = false; 
+      clearInterval(intervalId);
+    };
+  }, []);
+
   const allMachines = useMemo<Machine[]>(() =>
     config.buildings.flatMap((b) =>
       b.floors.flatMap((f) =>
@@ -37,8 +162,7 @@ export function useFactoryData(): {
         )
       )
     ),
-    [config]
-  );
+  [config]);
 
   const stats = useMemo<FactoryStats>(() => {
     const byStatus: Record<MachineStatus, number> = {
@@ -61,20 +185,19 @@ export function useFactoryData(): {
       totalFloors,
       totalRooms,
       totalLines,
-      productionToday: overviewData?.production.completed || 0,
-      activeBundles: overviewData?.bundles.inProgress || 0,
-      qcPassRate: overviewData?.production.completed ? Number(((overviewData.qc.pass / overviewData.production.completed) * 100).toFixed(1)) : 0,
-      alertsCount: 3, // Dummy, needs alert endpoint
-      absentWorkers: overviewData?.workers.absent || 0,
+      productionToday: 0,
+      activeBundles: 0,
+      qcPassRate: 0,
+      alertsCount: 0,
+      absentWorkers: 0,
     };
-  }, [allMachines, config, overviewData]);
+  }, [allMachines, config]);
 
   const getMachineById = useMemo(
     () => (id: string) => allMachines.find((m) => m.id === id),
     [allMachines]
   );
 
-  /** Returns full hierarchy context for a machine — used by Smart Inspector Panel */
   const getMachineContext = useMemo(
     () => (id: string): MachineContext | undefined => {
       for (const building of config.buildings) {
@@ -92,5 +215,5 @@ export function useFactoryData(): {
     [config]
   );
 
-  return { config, stats, allMachines, getMachineById, getMachineContext };
+  return { config, stats, allMachines, getMachineById, getMachineContext, loading };
 }

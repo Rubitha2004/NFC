@@ -75,7 +75,13 @@ export class QCCheckService {
 
     // If final QC passed, mark bundle as QC_COMPLETED and auto-release the tag
     if (dto.qcTier === 'FINAL_QC' && dto.status === 'PASS') {
-      await prisma.bundle.update({ where: { id: dto.bundleId }, data: { status: 'QC_COMPLETED' } });
+      await prisma.bundle.update({ 
+        where: { id: dto.bundleId }, 
+        data: { 
+          status: 'QC_COMPLETED',
+          completedQuantity: { increment: bundle.quantity }
+        } 
+      });
       
       if (dto.tagId) {
         await prisma.bundleTagAssignment.update({
@@ -87,6 +93,11 @@ export class QCCheckService {
           }
         });
       }
+    } else if (dto.status === 'REWORK' || dto.status === 'FAIL') {
+      await prisma.bundle.update({
+        where: { id: dto.bundleId },
+        data: { status: 'REWORK' }
+      });
     }
 
     return check;

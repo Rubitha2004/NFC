@@ -2,6 +2,7 @@ import { MachineRepository } from "../repository/machine.repository";
 import { CreateMachineDto, UpdateMachineDto } from "../dto/machine.dto";
 import { RecordStatus } from "@prisma/client";
 import { MachineSearchParams } from "../types/machine.types";
+import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
 
 export class MachineService {
   private repository = new MachineRepository();
@@ -32,7 +33,9 @@ export class MachineService {
       throw new Error("Terminal does not exist");
     }
 
-    return await this.repository.create(data);
+    const machine = await this.repository.create(data);
+    websocketService.publish(WEBSOCKET_EVENTS.MACHINE_CREATED, machine);
+    return machine;
   }
 
   async getAll(params: any) {
@@ -79,7 +82,9 @@ export class MachineService {
       }
     }
 
-    return await this.repository.update(id, data);
+    const updatedMachine = await this.repository.update(id, data);
+    websocketService.publish(WEBSOCKET_EVENTS.MACHINE_UPDATED, updatedMachine);
+    return updatedMachine;
   }
 
   async changeStatus(id: number, status: RecordStatus) {
@@ -87,6 +92,50 @@ export class MachineService {
     if (!machine) {
       throw new Error("Machine not found");
     }
-    return await this.repository.changeStatus(id, status);
+    const updatedMachine = await this.repository.changeStatus(id, status);
+    
+    // Logic Fix: Auto-release active assignments if machine is deactivated
+    if (status === 'INACTIVE') {
+      const prisma = require("../../../config/prisma").default;
+      await prisma.assignment.updateMany({
+        where: { machineId: id, status: 'ACTIVE' },
+        data: { status: 'COMPLETED', releasedAt: new Date() }
+      });
+    }
+
+    websocketService.publish(WEBSOCKET_EVENTS.MACHINE_UPDATED, updatedMachine);
+    return updatedMachine;
+  }
+
+  async assignRoom(id: number, data: { roomId: number | null, rowIndex: number | null, positionIndex: number | null }) {
+    const machine = await this.repository.findById(id);
+    if (!machine) {
+      throw new Error("Machine not found");
+    }
+
+    if (data.roomId && (!data.rowIndex || !data.positionIndex)) {
+      const prisma = require("../../../config/prisma").default;
+      const room = await prisma.room.findUnique({ where: { id: data.roomId } });
+      if (room) {
+        const count = await prisma.machine.count({ where: { roomId: data.roomId } });
+        
+        const newRowIndex = Math.floor(count / room.machinesPerRow) + 1;
+        const newPosIndex = (count % room.machinesPerRow) + 1;
+
+        data.rowIndex = newRowIndex;
+        data.positionIndex = newPosIndex;
+
+        if (newRowIndex > room.rowsCount) {
+          await prisma.room.update({
+            where: { id: room.id },
+            data: { rowsCount: newRowIndex }
+          });
+        }
+      }
+    }
+
+    const updatedMachine = await this.repository.assignRoom(id, data);
+    websocketService.publish(WEBSOCKET_EVENTS.MACHINE_UPDATED, updatedMachine);
+    return updatedMachine;
   }
 }

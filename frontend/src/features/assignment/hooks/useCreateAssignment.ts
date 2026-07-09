@@ -10,6 +10,7 @@ export function useCreateAssignment() {
     onSuccess: () => {
       toast.success('Assignment created successfully');
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to create assignment');

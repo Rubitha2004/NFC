@@ -1,5 +1,6 @@
-import { memo } from 'react';
-import { motion } from 'framer-motion';
+import { memo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { FactoryFloorLevel } from '../types/factory.types';
 import { Room } from './Room';
 
@@ -12,6 +13,8 @@ export const FloorLevel = memo(function FloorLevel({ floor, floorIndex }: FloorL
   const totalMachines = floor.rooms.flatMap((r) => r.lines.flatMap((l) => l.machines)).length;
   const running       = floor.rooms.flatMap((r) => r.lines.flatMap((l) => l.machines)).filter((m) => m.status === 'running').length;
 
+  const [isExpanded, setIsExpanded] = useState(true);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -20,8 +23,14 @@ export const FloorLevel = memo(function FloorLevel({ floor, floorIndex }: FloorL
       className="rounded-xl border border-white/[0.06] bg-zinc-900/30 overflow-hidden"
     >
       {/* Floor header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.05] bg-zinc-900/50">
+      <button 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between px-4 py-2.5 border-b border-white/[0.05] bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors"
+      >
         <div className="flex items-center gap-2.5">
+          <div className="text-white/40">
+            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </div>
           {/* Floor number pill */}
           <span className="w-6 h-6 rounded-md bg-white/[0.07] border border-white/[0.1] flex items-center justify-center text-[11px] font-bold text-white/50">
             {floor.floorNumber}
@@ -35,14 +44,23 @@ export const FloorLevel = memo(function FloorLevel({ floor, floorIndex }: FloorL
           <span className="text-[10px] text-white/25">·</span>
           <span className="text-[10px] text-emerald-400/70">{running} running</span>
         </div>
-      </div>
+      </button>
 
       {/* Rooms — side-by-side (floor plan layout) */}
-      <div className="p-4 flex flex-wrap gap-4 items-start">
-        {floor.rooms.map((room, roomIdx) => (
-          <Room key={room.id} room={room} roomIndex={roomIdx} />
-        ))}
-      </div>
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="p-4 flex flex-wrap gap-4 items-start"
+          >
+            {floor.rooms.map((room, roomIdx) => (
+              <Room key={room.id} room={room} roomIndex={roomIdx} />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 });

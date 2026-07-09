@@ -1,8 +1,10 @@
 import { StageLogRepository } from '../repository/stage-log.repository';
 import { ScanInDTO, ScanOutDTO } from '../dto/stage-log.dto';
 import prisma from '../../../config/prisma';
+import { IotService } from '../../iot/service/iot.service';
 
 const repo = new StageLogRepository();
+const iotService = new IotService();
 
 export class StageLogService {
   async getAll(bundleId?: number) {
@@ -14,35 +16,40 @@ export class StageLogService {
   }
 
   async scanIn(dto: ScanInDTO) {
-    // Validate entities exist
-    const [bundle, tag, operation, operator] = await Promise.all([
-      prisma.bundle.findUnique({ where: { id: dto.bundleId } }),
-      prisma.bundleTagAssignment.findUnique({ where: { id: dto.tagId } }),
-      prisma.operation.findUnique({ where: { id: dto.operationId } }),
-      prisma.worker.findUnique({ where: { id: dto.operatorId } }),
-    ]);
-    if (!bundle) throw new Error('Bundle not found');
+    // Route manual scan-in through the canonical IotService logic
+    const tag = await prisma.bundleTagAssignment.findUnique({ where: { id: dto.tagId } });
     if (!tag) throw new Error('Tag not found');
-    if (!operation) throw new Error('Operation not found');
-    if (!operator) throw new Error('Operator not found');
+    
+    const worker = await prisma.worker.findUnique({ where: { id: dto.operatorId } });
+    if (!worker) throw new Error('Operator not found');
 
-    // Check no open scan for this bundle+operation
-    const open = await repo.findOpenScan(dto.bundleId, dto.operationId);
-    if (open) throw new Error(`Bundle already has an open scan for operation "${operation.operationName}". Please scan out first.`);
-
-    const log = await repo.scanIn(dto);
-    // Update bundle current operation
-    await prisma.bundle.update({
-      where: { id: dto.bundleId },
-      data: { currentOperationId: dto.operationId, status: 'IN_PROGRESS' }
+    const assignment = await prisma.assignment.findFirst({
+        where: { workerId: dto.operatorId, operationId: dto.operationId, status: 'ACTIVE' },
+        include: { machine: { include: { terminal: true } } }
     });
-    return log;
+    if (!assignment || !assignment.machine.terminal) {
+        throw new Error('Worker must have an active assignment to a machine with a terminal to scan manually.');
+    }
+
+    return iotService.handleScan(tag.tagCode, worker.nfcCardId, assignment.machine.terminal.terminalCode);
   }
 
   async scanOut(logId: number, dto: ScanOutDTO) {
     const existing = await repo.findById(logId);
     if (!existing) throw new Error('Stage log not found');
-    if (existing.outTime) throw new Error('This scan has already been closed (scan out recorded)');
-    return repo.scanOut(logId, dto.remarks);
+    if (existing.outTime) throw new Error('This scan has already been closed');
+    
+    const tag = await prisma.bundleTagAssignment.findUnique({ where: { id: existing.tagId } });
+    const worker = await prisma.worker.findUnique({ where: { id: existing.operatorId } });
+    
+    const assignment = await prisma.assignment.findFirst({
+        where: { workerId: existing.operatorId, operationId: existing.operationId, status: 'ACTIVE' },
+        include: { machine: { include: { terminal: true } } }
+    });
+    if (!assignment || !assignment.machine.terminal) {
+        throw new Error('Worker must have an active assignment to a machine with a terminal to scan manually.');
+    }
+
+    return iotService.handleScan(tag!.tagCode, worker!.nfcCardId, assignment.machine.terminal.terminalCode);
   }
 }

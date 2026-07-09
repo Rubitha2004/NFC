@@ -92,7 +92,7 @@ export function StageTrackingTab() {
               <select value={form.bundleId} onChange={e => setForm(f => ({ ...f, bundleId: e.target.value }))}
                 className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                 <option value="">Select bundle...</option>
-                {bundles.map(b => <option key={b.id} value={b.id}>{b.bundleNumber}</option>)}
+                {bundles.map((b: any) => <option key={b.id} value={b.id}>{b.bundleNumber}</option>)}
               </select>
             </div>
             <div>
@@ -100,7 +100,7 @@ export function StageTrackingTab() {
               <select value={form.tagId} onChange={e => setForm(f => ({ ...f, tagId: e.target.value }))}
                 className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                 <option value="">Select tag...</option>
-                {tags.filter(t => t.status === 'AVAILABLE' || t.id === Number(form.tagId)).map(t => (
+                {tags.filter((t: any) => t.status === 'AVAILABLE' || t.id === Number(form.tagId)).map((t: any) => (
                   <option key={t.id} value={t.id}>{t.tagCode} ({t.status})</option>
                 ))}
               </select>
@@ -110,7 +110,7 @@ export function StageTrackingTab() {
               <select value={form.operationId} onChange={e => setForm(f => ({ ...f, operationId: e.target.value }))}
                 className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                 <option value="">Select operation...</option>
-                {operations.map(o => <option key={o.id} value={o.id}>{o.operationName}</option>)}
+                {operations.map((o: any) => <option key={o.id} value={o.id}>{o.operationName}</option>)}
               </select>
             </div>
             <div>
@@ -118,7 +118,7 @@ export function StageTrackingTab() {
               <select value={form.operatorId} onChange={e => setForm(f => ({ ...f, operatorId: e.target.value }))}
                 className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500">
                 <option value="">Select worker...</option>
-                {workers.map(w => <option key={w.id} value={w.id}>{w.firstName} {w.lastName} ({w.employeeCode})</option>)}
+                {workers.map((w: any) => <option key={w.id} value={w.id}>{w.firstName} {w.lastName} ({w.employeeCode})</option>)}
               </select>
             </div>
             <div>

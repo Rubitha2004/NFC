@@ -100,27 +100,27 @@ async function main() {
   const opBodyJoin = await prisma.operation.upsert({
     where: { operationCode: 'OP-BJO' },
     update: {},
-    create: { operationCode: 'OP-BJO', operationName: 'Body Joining', standardMinuteValue: 1.2, displayOrder: 1 }
+    create: { operationCode: 'OP-BJO', operationName: 'Body Joining', standardMinuteValue: 1.2, displayOrder: 1, requiredSkillId: skillCollar.id }
   });
   const opCollar = await prisma.operation.upsert({
     where: { operationCode: 'OP-CATT' },
     update: {},
-    create: { operationCode: 'OP-CATT', operationName: 'Collar Attaching', standardMinuteValue: 1.5, displayOrder: 2 }
+    create: { operationCode: 'OP-CATT', operationName: 'Collar Attaching', standardMinuteValue: 1.5, displayOrder: 2, requiredSkillId: skillCollar.id }
   });
   const opSleeve = await prisma.operation.upsert({
     where: { operationCode: 'OP-SLVS' },
     update: {},
-    create: { operationCode: 'OP-SLVS', operationName: 'Sleeve Setting', standardMinuteValue: 2.0, displayOrder: 3 }
+    create: { operationCode: 'OP-SLVS', operationName: 'Sleeve Setting', standardMinuteValue: 2.0, displayOrder: 3, requiredSkillId: skillSleeve.id }
   });
   const opSideSeam = await prisma.operation.upsert({
     where: { operationCode: 'OP-SSAM' },
     update: {},
-    create: { operationCode: 'OP-SSAM', operationName: 'Side Seam', standardMinuteValue: 1.8, displayOrder: 4 }
+    create: { operationCode: 'OP-SSAM', operationName: 'Side Seam', standardMinuteValue: 1.8, displayOrder: 4, requiredSkillId: skillOverlock.id }
   });
   const opHemming = await prisma.operation.upsert({
     where: { operationCode: 'OP-HEM' },
     update: {},
-    create: { operationCode: 'OP-HEM', operationName: 'Bottom Hemming', standardMinuteValue: 0.9, displayOrder: 5 }
+    create: { operationCode: 'OP-HEM', operationName: 'Bottom Hemming', standardMinuteValue: 0.9, displayOrder: 5, requiredSkillId: skillOverlock.id }
   });
   const opFinalQC = await prisma.operation.upsert({
     where: { operationCode: 'OP-FQC' },
@@ -133,15 +133,15 @@ async function main() {
   // =============================================
   console.log('Creating terminals & machines...');
   const terminals = [];
-  for (let i = 1; i <= 10; i++) {
+  for (let i = 1; i <= 140; i++) {
     const t = await prisma.terminal.upsert({
       where: { terminalCode: `TERM-${i.toString().padStart(3,'0')}` },
       update: { lastHeartbeat: new Date() },
       create: {
         terminalCode: `TERM-${i.toString().padStart(3,'0')}`,
         terminalName: `Terminal ${i}`,
-        ipAddress: `192.168.10.${100 + i}`,
-        macAddress: `AA:BB:CC:DD:EE:${i.toString().padStart(2,'0')}`,
+        ipAddress: `192.168.10.${100 + (i % 150)}`,
+        macAddress: `AA:BB:CC:DD:EE:${(i % 99).toString().padStart(2,'0')}`,
         firmwareVersion: 'v2.1.4',
         lastHeartbeat: new Date()
       }
@@ -149,31 +149,32 @@ async function main() {
     terminals.push(t);
   }
 
-  const machineData = [
-    { code: 'MCH-001', name: 'Juki DDL-9000C', type: mtJuki, dept: deptSewing, terminal: terminals[0] },
-    { code: 'MCH-002', name: 'Juki DDL-8700H', type: mtJuki, dept: deptSewing, terminal: terminals[1] },
-    { code: 'MCH-003', name: 'Juki DDL-9000B', type: mtJuki, dept: deptSewing, terminal: terminals[2] },
-    { code: 'MCH-004', name: 'Brother MO-6714DA', type: mtBrother, dept: deptSewing, terminal: terminals[3] },
-    { code: 'MCH-005', name: 'Brother MO-6816E', type: mtBrother, dept: deptSewing, terminal: terminals[4] },
-    { code: 'MCH-006', name: 'Pfaff 3306', type: mtPfaff, dept: deptSewing, terminal: terminals[5] },
-    { code: 'MCH-007', name: 'Singer 300W', type: mtSinger, dept: deptFinishing, terminal: terminals[6] },
-    { code: 'MCH-008', name: 'Juki LH-3568', type: mtJuki, dept: deptCutting, terminal: terminals[7] },
-    { code: 'MCH-009', name: 'Brother PR-680W', type: mtBrother, dept: deptFinishing, terminal: terminals[8] },
-    { code: 'MCH-010', name: 'Juki AMS-221', type: mtJuki, dept: deptSewing, terminal: terminals[9] },
-  ];
-
   const machines = [];
-  for (const m of machineData) {
+  for (let i = 1; i <= 140; i++) {
+    const isBrother = i % 3 === 0;
+    const isPfaff = i % 7 === 0;
+    
+    const type = isPfaff ? mtPfaff : isBrother ? mtBrother : mtJuki;
+    const dept = isPfaff ? deptCutting : isBrother ? deptFinishing : deptSewing;
+    const code = `MCH-${i.toString().padStart(3,'0')}`;
+    const name = `${type.name} - ${i}`;
+    
     try {
       const machine = await prisma.machine.upsert({
-        where: { machineCode: m.code },
+        where: { machineCode: code },
         update: {},
-        create: { machineCode: m.code, machineName: m.name, departmentId: m.dept.id, machineTypeId: m.type.id, terminalId: m.terminal.id }
+        create: { 
+            machineCode: code, 
+            machineName: name, 
+            departmentId: dept.id, 
+            machineTypeId: type.id, 
+            terminalId: terminals[i-1].id 
+        }
       });
       machines.push(machine);
     } catch (e: any) {
       // If terminal already linked, find existing machine or skip
-      const existing = await prisma.machine.findFirst({ where: { terminalId: m.terminal.id } });
+      const existing = await prisma.machine.findFirst({ where: { terminalId: terminals[i-1].id } });
       if (existing) machines.push(existing);
     }
   }
@@ -191,6 +192,18 @@ async function main() {
     { code: 'EMP-0009', nfc: 'NFC-AA0009', first: 'Dinesh', last: 'Pandey', gender: 'M', dept: deptQC, grade: gradeA },
     { code: 'EMP-0010', nfc: 'NFC-AA0010', first: 'Anitha', last: 'Subramanian', gender: 'F', dept: deptSewing, grade: gradeC },
   ];
+
+  // Dynamically generate 50 additional workers
+  const firstNames = ['Amit', 'Raj', 'Sita', 'Gita', 'Mohan', 'Suresh', 'Ramesh', 'Rani', 'Geeta', 'Neha', 'Pooja', 'Vikram', 'Anil', 'Sunil', 'Kiran', 'Asha', 'Usha', 'Deepa', 'Jyoti', 'Kavita', 'Manoj', 'Rakesh', 'Sanjay', 'Vijay', 'Ajay'];
+  const lastNames = ['Kumar', 'Sharma', 'Singh', 'Patel', 'Yadav', 'Gupta', 'Verma', 'Reddy', 'Nair', 'Menon', 'Iyer', 'Das', 'Bose', 'Dutta', 'Chowdhury', 'Sen', 'Pillai', 'Rao', 'Deshmukh', 'Patil'];
+  for (let i = 11; i <= 60; i++) {
+    const first = firstNames[i % firstNames.length];
+    const last = lastNames[i % lastNames.length];
+    const gender = i % 2 === 0 ? 'M' : 'F';
+    const dept = i % 3 === 0 ? deptCutting : i % 2 === 0 ? deptFinishing : deptSewing;
+    const grade = i % 5 === 0 ? gradeA : i % 2 === 0 ? gradeB : gradeC;
+    workerData.push({ code: `EMP-${i.toString().padStart(4, '0')}`, nfc: `NFC-AA${i.toString().padStart(4, '0')}`, first, last, gender, dept, grade });
+  }
 
   const workers = [];
   for (const w of workerData) {
@@ -318,7 +331,7 @@ async function main() {
   }
 
   // =============================================
-  // 6. ASSIGNMENTS & ATTENDANCE
+  // 6. ASSIGNMENTS & ATTENDANCE & MACHINE_OPERATION
   // =============================================
   console.log('Creating assignments & attendance...');
   for (let i = 0; i < Math.min(workers.length, 8); i++) {
@@ -329,6 +342,16 @@ async function main() {
           operationId: i % 2 === 0 ? opCollar.id : opSleeve.id,
           shiftId: i % 2 === 0 ? shiftMorning.id : shiftEvening.id,
           status: 'ACTIVE'
+        }
+      });
+
+      // Machine operation assignment
+      await prisma.machineOperationAssignment.upsert({
+        where: { machineId_shiftId: { machineId: machines[i].id, shiftId: i % 2 === 0 ? shiftMorning.id : shiftEvening.id } },
+        update: {},
+        create: {
+          machineId: machines[i].id, operationId: i % 2 === 0 ? opCollar.id : opSleeve.id,
+          shiftId: i % 2 === 0 ? shiftMorning.id : shiftEvening.id, status: 'ACTIVE'
         }
       });
 
@@ -379,7 +402,7 @@ async function main() {
   console.log(`  - 2 Shifts`);
   console.log(`  - 3 Grades, 3 Skills`);
   console.log(`  - 6 Operations`);
-  console.log(`  - 10 Terminals & 10 Machines`);
+  console.log(`  - 140 Terminals & 140 Machines`);
   console.log(`  - 10 Workers`);
   console.log(`  - 5 Production Orders (Nike, Adidas, H&M, Zara, M&S)`);
   console.log(`  - 20 Bundles with Transactions`);

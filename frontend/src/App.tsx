@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { queryClient } from "@/services/queryClient";
 import { AppRouter } from "@/routes";
 import { LoadingScreen } from "@/shared/components/LoadingScreen";
+import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -28,8 +29,9 @@ export default function App() {
         <BrowserRouter>
           {/* Premium loading screen on app init */}
           <LoadingScreen isVisible={isLoading} />
-          
-          {!isLoading && <AppRouter />}
+          <ErrorBoundary>
+            {!isLoading && <AppRouter />}
+          </ErrorBoundary>
         </BrowserRouter>
         <Toaster richColors position="top-right" />
       </QueryClientProvider>

@@ -105,10 +105,15 @@ export const MachineCard = memo(function MachineCard({ machine, statusFilter }: 
         )}
       </motion.button>
 
-      {/* Machine type label */}
-      <span className="mt-1 text-[8.5px] text-muted-foreground/50 truncate max-w-[84px] text-center">
-        {machine.machineType}
-      </span>
+      {/* Machine type and department label */}
+      <div className="mt-1 flex flex-col items-center">
+        <span className="text-[9px] font-semibold text-white/70 truncate max-w-[84px] text-center">
+          {machine.department || 'Production'}
+        </span>
+        <span className="text-[7.5px] text-muted-foreground/50 truncate max-w-[84px] text-center">
+          {machine.machineType}
+        </span>
+      </div>
     </div>
   );
 });

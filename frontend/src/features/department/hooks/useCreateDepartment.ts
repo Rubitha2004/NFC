@@ -17,6 +17,7 @@ export function useCreateDepartment() {
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [DEPARTMENTS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
       toast.success('Department created successfully');
     },
 

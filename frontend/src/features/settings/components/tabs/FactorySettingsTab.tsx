@@ -10,10 +10,6 @@ export function FactorySettingsTab() {
     resolver: zodResolver(factorySettingsSchema),
     defaultValues: {
       factoryName: "Main Production Facility",
-      buildings: 2,
-      floors: 3,
-      rooms: 12,
-      productionLines: 8,
       defaultShift: "morning",
     },
   });
@@ -37,49 +33,7 @@ export function FactorySettingsTab() {
             </FormItem>
           )} />
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-white/5">
-            <FormField control={form.control} name="buildings" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white/70">Total Buildings</FormLabel>
-                <FormControl>
-                  <Input type="number" className="bg-zinc-900/50 border-white/10 text-white" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField control={form.control} name="floors" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white/70">Floors (Avg/Bldg)</FormLabel>
-                <FormControl>
-                  <Input type="number" className="bg-zinc-900/50 border-white/10 text-white" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField control={form.control} name="rooms" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white/70">Total Rooms</FormLabel>
-                <FormControl>
-                  <Input type="number" className="bg-zinc-900/50 border-white/10 text-white" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <FormField control={form.control} name="productionLines" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-white/70">Production Lines</FormLabel>
-                <FormControl>
-                  <Input type="number" className="bg-zinc-900/50 border-white/10 text-white" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-          </div>
-
-          <div className="pt-4 border-t border-white/5">
+          <div className="pt-4 mt-6 border-t border-white/5">
             <FormField control={form.control} name="defaultShift" render={({ field }) => (
               <FormItem className="max-w-xs">
                 <FormLabel className="text-white/70">Default Factory Shift</FormLabel>

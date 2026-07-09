@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "rooms" ADD COLUMN     "machinesPerRow" INTEGER NOT NULL DEFAULT 35,
+ALTER COLUMN "rowsCount" SET DEFAULT 3;

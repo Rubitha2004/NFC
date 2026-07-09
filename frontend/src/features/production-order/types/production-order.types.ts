@@ -34,6 +34,8 @@ export interface ProductionOrder {
     workersCount: number;
     machinesCount: number;
     bundlesCount: number;
+    workersList?: { id: number, name: string, code: string }[];
+    machinesList?: { id: number, name: string, code: string }[];
   };
 }
 

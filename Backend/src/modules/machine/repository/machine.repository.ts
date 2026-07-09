@@ -45,6 +45,11 @@ export class MachineRepository {
           department: true,
           machineType: true,
           terminal: true,
+          room: true,
+          assignments: {
+            where: { status: "ACTIVE" },
+            include: { worker: true, operation: true, shift: true }
+          }
         }
       })
     ]);
@@ -64,6 +69,11 @@ export class MachineRepository {
         department: true,
         machineType: true,
         terminal: true,
+        room: true,
+        assignments: {
+          where: { status: "ACTIVE" },
+          include: { worker: true, operation: true, shift: true }
+        }
       }
     });
   }
@@ -109,6 +119,14 @@ export class MachineRepository {
   async checkTerminalExists(id: number) {
     return prisma.terminal.findUnique({
       where: { id },
+    });
+  }
+
+  async assignRoom(id: number, data: { roomId: number | null, rowIndex: number | null, positionIndex: number | null }) {
+    return prisma.machine.update({
+      where: { id },
+      data,
+      include: { room: true },
     });
   }
 }

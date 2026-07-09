@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { MachineService } from "../service/machine.service";
-import { createMachineSchema, updateMachineSchema, changeMachineStatusSchema } from "../validation/machine.validation";
+import { createMachineSchema, updateMachineSchema, changeMachineStatusSchema, assignMachineRoomSchema } from "../validation/machine.validation";
 
 export class MachineController {
   private service = new MachineService();
@@ -111,6 +111,25 @@ export class MachineController {
       return res.status(400).json({
         success: false,
         message: error.message || "Failed to update machine status",
+      });
+    }
+  };
+
+  assignRoom = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      const data = assignMachineRoomSchema.parse(req.body);
+      const machine = await this.service.assignRoom(id, data);
+      
+      return res.status(200).json({
+        success: true,
+        message: "Machine assigned to room successfully",
+        data: machine,
+      });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Failed to assign machine room",
       });
     }
   };

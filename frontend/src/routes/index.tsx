@@ -6,8 +6,6 @@ import { ProtectedRoute, GuestRoute } from "./guards";
 // Auth
 import LoginPage from "@/features/settings/LoginPage";
 
-// Dashboard (Factory Control Center)
-import ControlCenterPage from "@/features/control-center/ControlCenterPage";
 import LiveFactoryPage from "@/features/factory/LiveFactoryPage";
 
 // Terminals (Standalone fullscreen apps)
@@ -52,13 +50,13 @@ import TagWorkflowPage from "@/features/tag-workflow/TagWorkflowPage";
 import ReportsPage from "@/features/reports/ReportsPage";
 
 // Planning
-import PlanningDashboardPage from "@/features/planning/PlanningDashboardPage";
 import PlanningBoardPage from "@/features/planning/PlanningBoardPage";
 import ResourceAllocationPage from "@/features/planning/ResourceAllocationPage";
-import ProductionTimelinePage from "@/features/planning/ProductionTimelinePage";
 import PlanningCenterPage from "@/features/planning/PlanningCenterPage"; // New unified UI
 
 // Settings
+import { GeneralSettingsTab } from "../features/settings/components/tabs/GeneralSettingsTab";
+import FactoryLayoutPage from "../features/factory-layout/FactoryLayoutPage";
 import SettingsPage from "@/features/settings/SettingsPage";
 import UserManagementPage from "@/features/user-management/UserManagementPage";
 
@@ -86,13 +84,10 @@ export function AppRouter() {
 
         <Route element={<DashboardLayout />}>
           <Route path="/planning/center" element={<PlanningCenterPage />} />
-          <Route path="/planning/dashboard" element={<PlanningDashboardPage />} />
           <Route path="/planning/board" element={<PlanningBoardPage />} />
           <Route path="/planning/resources" element={<ResourceAllocationPage />} />
-          <Route path="/planning/timeline" element={<ProductionTimelinePage />} />
-
-          <Route path="/dashboard" element={<ControlCenterPage />} />
           <Route path="/live-factory" element={<LiveFactoryPage />} />
+          <Route path="/factory-layout" element={<FactoryLayoutPage />} />
           <Route path="/departments" element={<DepartmentManagement />} />
           <Route path="/workers" element={<WorkersPage />} />
           <Route path="/machines" element={<MachinesPage />} />

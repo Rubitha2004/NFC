@@ -117,6 +117,13 @@ export interface PlanningMachine {
     name: string;
   };
   assignments: Array<any>;
+  roomId?: number | null;
+  rowIndex?: number | null;
+  positionIndex?: number | null;
+  room?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 export interface PlanningResources {

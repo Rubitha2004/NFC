@@ -15,18 +15,18 @@ export const ProductionLine = memo(function ProductionLine({
   lineIndex,
 }: ProductionLineProps) {
   const { statusFilter } = useFactoryStore();
+  
+  // Assume a default capacity of 35 machines per line if not specified
+  const capacity = 35;
+  const topCapacity = Math.ceil(capacity / 2);
+  const bottomCapacity = Math.floor(capacity / 2);
 
   // Split machines into top and bottom rows by their position.row field
   const topMachines = line.machines.filter((m) => m.position.row === 'top');
   const bottomMachines = line.machines.filter((m) => m.position.row === 'bottom');
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: lineIndex * 0.08 }}
-      className="relative"
-    >
+    <div className="relative mb-6">
       {/* Line header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="flex items-center gap-2">
@@ -54,10 +54,15 @@ export const ProductionLine = memo(function ProductionLine({
                 statusFilter={statusFilter}
               />
             ))}
+          {Array.from({ length: Math.max(0, topCapacity - topMachines.length) }).map((_, i) => (
+            <div key={`empty-top-${i}`} className="w-[88px] h-[88px] rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex items-center justify-center">
+              <span className="text-[10px] text-white/10">Slot</span>
+            </div>
+          ))}
         </div>
 
         {/* Central table / walking path */}
-        <ProductionTable machineCount={Math.max(topMachines.length, bottomMachines.length)} />
+        <ProductionTable machineCount={Math.max(topCapacity, bottomCapacity)} />
 
         {/* Bottom row of machines */}
         <div className="px-4 pt-2 pb-4 flex flex-wrap gap-3">
@@ -70,9 +75,14 @@ export const ProductionLine = memo(function ProductionLine({
                 statusFilter={statusFilter}
               />
             ))}
+          {Array.from({ length: Math.max(0, bottomCapacity - bottomMachines.length) }).map((_, i) => (
+            <div key={`empty-bottom-${i}`} className="w-[88px] h-[88px] rounded-xl border border-dashed border-white/10 bg-white/[0.01] flex items-center justify-center">
+              <span className="text-[10px] text-white/10">Slot</span>
+            </div>
+          ))}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 });
 

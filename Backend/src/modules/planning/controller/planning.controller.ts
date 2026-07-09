@@ -78,6 +78,15 @@ export class PlanningController {
       res.status(400).json({ error: error.message });
     }
   }
+
+  async getHistory(req: Request, res: Response) {
+    try {
+      const result = await planningService.getHistory();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export const planningController = new PlanningController();

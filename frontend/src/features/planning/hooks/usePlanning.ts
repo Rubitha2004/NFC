@@ -8,16 +8,4 @@ export function usePlanningDashboard() {
   });
 }
 
-export function usePlanningTasks() {
-  return useQuery({
-    queryKey: ['planning', 'tasks'],
-    queryFn: () => planningService.getAllTasks(),
-  });
-}
 
-export function usePlanningResources() {
-  return useQuery<import('../types/planning.types').PlanningResources>({
-    queryKey: ['planning', 'resources'],
-    queryFn: () => planningService.getResourceAvailability(),
-  });
-}
