@@ -67,7 +67,7 @@ export function DashboardView() {
               <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
                 <h3 className="text-sm font-bold text-white/60 uppercase tracking-wider mb-6">Summary</h3>
                 <div className="space-y-4">
-                  {data.qcData.map(d => (
+                  {data.qcData.map((d: any) => (
                     <div key={d.name} className="flex justify-between items-center p-4 bg-zinc-950 rounded-lg border border-white/5">
                       <div className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></div>

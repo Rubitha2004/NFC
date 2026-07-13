@@ -51,7 +51,6 @@ import ReportsPage from "@/features/reports/ReportsPage";
 
 // Planning
 import PlanningBoardPage from "@/features/planning/PlanningBoardPage";
-import ResourceAllocationPage from "@/features/planning/ResourceAllocationPage";
 import PlanningCenterPage from "@/features/planning/PlanningCenterPage"; // New unified UI
 
 // Settings
@@ -85,7 +84,6 @@ export function AppRouter() {
         <Route element={<DashboardLayout />}>
           <Route path="/planning/center" element={<PlanningCenterPage />} />
           <Route path="/planning/board" element={<PlanningBoardPage />} />
-          <Route path="/planning/resources" element={<ResourceAllocationPage />} />
           <Route path="/live-factory" element={<LiveFactoryPage />} />
           <Route path="/factory-layout" element={<FactoryLayoutPage />} />
           <Route path="/departments" element={<DepartmentManagement />} />

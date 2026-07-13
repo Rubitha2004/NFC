@@ -35,7 +35,12 @@ export class DashboardRepository {
       // Machine summary metrics
       prisma.machine.count({ where: { status: 'ACTIVE' } }),
       prisma.terminal.count({
-        where: { lastHeartbeat: { lt: fiveMinsAgo } }
+        where: {
+          OR: [
+            { lastHeartbeat: null },
+            { lastHeartbeat: { lt: fiveMinsAgo } }
+          ]
+        }
       }),
 
       // Production summary metrics
@@ -54,13 +59,11 @@ export class DashboardRepository {
       }),
 
       // QC summary metrics
-      prisma.qC.aggregate({
-        _sum: {
-          passQuantity: true,
-          rejectQuantity: true,
-          reworkQuantity: true
-        },
-        where: { inspectionTime: { gte: startOfToday } }
+      prisma.qCCheckLog.groupBy({
+        by: ['status'],
+        _count: { id: true },
+        where: { checkedAt: { gte: startOfToday } },
+        orderBy: { status: 'asc' }
       })
     ]);
 

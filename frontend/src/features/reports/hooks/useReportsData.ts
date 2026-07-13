@@ -1,61 +1,47 @@
-import { useMemo } from "react";
-
-function seeded(seed: number, max: number) {
-  const x = Math.sin(seed + 1) * 10000;
-  return Math.floor((x - Math.floor(x)) * max);
-}
+import { useQuery } from '@tanstack/react-query';
+import { reportsService } from '../services/reports.service';
 
 export function useReportsData() {
-  const productionData = useMemo(() => {
-    return Array.from({ length: 12 }).map((_, i) => ({
-      time: `${i + 8}:00`,
-      output: 50 + seeded(i, 80),
-      target: 100,
-    }));
-  }, []);
+  const { data: rawDashboard } = useQuery({
+    queryKey: ['dashboardOverview'],
+    queryFn: reportsService.getDashboard,
+    refetchInterval: 30000, // Real-timeish
+  });
 
-  const workerData = useMemo(() => {
-    return [
-      { name: "John Doe", efficiency: 92, defects: 2 },
-      { name: "Jane Smith", efficiency: 88, defects: 4 },
-      { name: "Alice Fox", efficiency: 95, defects: 1 },
-      { name: "Bob Ross", efficiency: 78, defects: 8 },
-      { name: "Charlie Day", efficiency: 85, defects: 3 },
-    ];
-  }, []);
+  const { data: rawQC } = useQuery({
+    queryKey: ['reportsQC'],
+    queryFn: reportsService.getQC,
+  });
 
-  const qcData = useMemo(() => {
-    return [
-      { name: "Pass", value: 850, color: "#10b981" },
-      { name: "Fail", value: 45, color: "#f43f5e" },
-      { name: "Rework", value: 105, color: "#f59e0b" },
-    ];
-  }, []);
-
-  const machineData = useMemo(() => {
-    return Array.from({ length: 7 }).map((_, i) => ({
-      day: `Day ${i + 1}`,
-      uptime: 80 + seeded(i * 2, 20),
-      downtime: seeded(i * 2 + 1, 15),
-    }));
-  }, []);
-
-  const downtimeHeatmapData = useMemo(() => {
-    const machines = ["MCH-1", "MCH-2", "MCH-3", "MCH-4", "MCH-5"];
-    const shifts = ["Morning", "Afternoon", "Night"];
+  // Map API response to chart formats or provide fallbacks while loading
+  
+  // Dashboard API gives us qcAggregate: [{ status: "PASS", _count: { id: 10 } }, ...]
+  const qcData = (rawDashboard?.qcAggregate || []).map((item: any) => {
+    let color = "#10b981"; // Default PASS
+    if (item.status === "FAIL") color = "#f43f5e";
+    if (item.status === "REWORK") color = "#f59e0b";
     
-    const data = [];
-    for (const m of machines) {
-      for (const s of shifts) {
-        data.push({
-          machine: m,
-          shift: s,
-          severity: seeded(m.charCodeAt(0) * s.charCodeAt(0), 100) // 0-100 severity
-        });
-      }
-    }
-    return data;
-  }, []);
+    // Map status enum to human readable if needed
+    const nameMap: any = { PASS: "Pass", FAIL: "Fail", REWORK: "Rework" };
+    return { name: nameMap[item.status] || item.status, value: item._count.id, color };
+  });
+
+  // Since we are mocking production output, we'll keep it simple for now or read from Dashboard 
+  // Let's use todaysCompletedQuantity from dashboard if available
+  const productionData = [
+    { time: "Today", output: rawDashboard?.todaysCompletedQuantity || 0, target: 500 }
+  ];
+
+  // We need to map other stats here. For now, to prevent UI crashes, provide defaults
+  const workerData = [
+    { name: "Active", efficiency: 100, defects: 0, count: rawDashboard?.presentWorkersCount || 0 }
+  ];
+
+  const machineData = [
+    { day: "Today", uptime: rawDashboard?.totalMachines || 0, downtime: rawDashboard?.offlineTerminals || 0 }
+  ];
+
+  const downtimeHeatmapData: any[] = [];
 
   return {
     productionData,

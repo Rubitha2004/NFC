@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WorkerService = void 0;
 const worker_repository_1 = require("../repository/worker.repository");
+const websocket_1 = require("../../websocket");
 class WorkerService {
     repository;
     constructor(repository) {
@@ -28,7 +29,9 @@ class WorkerService {
         if (!grade) {
             throw new Error("Grade does not exist");
         }
-        return await this.repository.create(data);
+        const worker = await this.repository.create(data);
+        websocket_1.websocketService.publish(websocket_1.WEBSOCKET_EVENTS.WORKER_CREATED, worker);
+        return worker;
     }
     async getAll(params) {
         return await this.repository.findAll(params);
@@ -70,14 +73,26 @@ class WorkerService {
                 throw new Error("Grade does not exist");
             }
         }
-        return await this.repository.update(id, data);
+        const updatedWorker = await this.repository.update(id, data);
+        websocket_1.websocketService.publish(websocket_1.WEBSOCKET_EVENTS.WORKER_UPDATED, updatedWorker);
+        return updatedWorker;
     }
     async changeStatus(id, status) {
         const worker = await this.repository.findById(id);
         if (!worker) {
             throw new Error("Worker not found");
         }
-        return await this.repository.changeStatus(id, status);
+        const updatedWorker = await this.repository.changeStatus(id, status);
+        // Logic Fix: Auto-release active assignments if worker is deactivated
+        if (status === 'INACTIVE') {
+            const prisma = require("../../../config/prisma").default;
+            await prisma.assignment.updateMany({
+                where: { workerId: id, status: 'ACTIVE' },
+                data: { status: 'COMPLETED', releasedAt: new Date() }
+            });
+        }
+        websocket_1.websocketService.publish(websocket_1.WEBSOCKET_EVENTS.WORKER_STATUS_CHANGED, updatedWorker);
+        return updatedWorker;
     }
 }
 exports.WorkerService = WorkerService;

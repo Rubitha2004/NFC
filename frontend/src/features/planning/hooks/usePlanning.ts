@@ -8,4 +8,10 @@ export function usePlanningDashboard() {
   });
 }
 
+export function usePlanningHistory() {
+  return useQuery({
+    queryKey: ['planning', 'history'],
+    queryFn: () => planningService.getHistory(),
+  });
+}
 

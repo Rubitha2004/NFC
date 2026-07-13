@@ -36,5 +36,6 @@ exports.PublishPlanSchema = zod_1.z.object({
         workerId: zod_1.z.number(),
         machineId: zod_1.z.number(),
         shiftId: zod_1.z.number().optional()
-    }))
+    })),
+    operations: zod_1.z.array(zod_1.z.number()).optional()
 });

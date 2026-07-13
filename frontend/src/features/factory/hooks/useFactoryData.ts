@@ -8,6 +8,8 @@ import type {
 import api from '@/services/axios';
 import { mapMachineAPIToUI } from '@/features/machine/services/machine.service';
 
+import { socketService } from '@/services/socket';
+
 export function useFactoryData(): {
   config: FactoryConfig;
   stats: FactoryStats;
@@ -24,13 +26,15 @@ export function useFactoryData(): {
 
     async function loadData() {
       try {
-        const [machinesRes] = await Promise.all([
-          api.get('/machines?limit=2000') // increased limit to support 420+ machines
+        const [machinesRes, floorsRes] = await Promise.all([
+          api.get('/machines?limit=2000'), // increased limit to support 420+ machines
+          api.get('/floors') // get actual layout hierarchy
         ]);
 
         if (!mounted) return;
 
         const rawMachines = machinesRes.data.data?.data || machinesRes.data.data || [];
+        const rawFloors = floorsRes.data.data || [];
 
         const mappedMachines = rawMachines.map((m: any, index: number) => {
           const uiMachine = mapMachineAPIToUI(m);
@@ -85,45 +89,66 @@ export function useFactoryData(): {
             powerStatus: 'on',
             networkStatus: 'online',
             todayTimeline: [],
-            position: { row: index % 2 === 0 ? 'bottom' : 'top', index }
+            // Set original indices for reference, row is overridden in rendering but position matches DB
+            position: { row: m.rowIndex % 2 === 0 ? 'top' : 'bottom', index: m.positionIndex || index }
           };
           
           return factoryMachine;
         });
 
-        // Build lines based on machines
-        const lines: ProductionLine[] = [];
-        const machinesPerRow = 35;
-        // Limit to exactly 4 rows as requested by the user
-        const totalRows = 4;
-        
-        for (let i = 0; i < totalRows; i++) {
-          lines.push({
-            id: `line-${i+1}`,
-            lineNumber: i + 1,
-            lineName: `Row ${i + 1}`,
-            machines: mappedMachines.slice(i * machinesPerRow, (i + 1) * machinesPerRow)
+        const factoryFloors: FactoryFloorLevel[] = rawFloors.map((floor: any) => {
+          const rooms: FactoryRoom[] = floor.rooms.map((room: any) => {
+            const roomMachines = rawMachines.filter((m: any) => m.roomId === room.id);
+            
+            // Group machines in this room by rowIndex
+            const rowMap = new Map<number, any[]>();
+            roomMachines.forEach((m: any) => {
+              const rowIndex = m.rowIndex || 0;
+              if (!rowMap.has(rowIndex)) rowMap.set(rowIndex, []);
+              rowMap.get(rowIndex)!.push(m);
+            });
+
+            const lines: ProductionLine[] = Array.from(rowMap.entries())
+              .sort((a, b) => a[0] - b[0])
+              .map(([rowIndex, rowMachinesList]) => {
+                const machineIds = rowMachinesList.map(m => String(m.machineCode));
+                const mappedRowMachines = mappedMachines.filter((m: Machine) => machineIds.includes(m.id));
+                
+                // Sort machines within the row by positionIndex
+                mappedRowMachines.sort((a: Machine, b: Machine) => {
+                  const m1 = rawMachines.find((rm: any) => String(rm.machineCode) === a.id);
+                  const m2 = rawMachines.find((rm: any) => String(rm.machineCode) === b.id);
+                  return (m1?.positionIndex || 0) - (m2?.positionIndex || 0);
+                });
+
+                return {
+                  id: `room-${room.id}-row-${rowIndex}`,
+                  lineNumber: rowIndex + 1,
+                  lineName: `Row ${rowIndex + 1}`,
+                  machines: mappedRowMachines
+                };
+              });
+
+            return {
+              id: `room-${room.id}`,
+              name: room.roomName,
+              roomType: 'stitching',
+              lines: lines
+            };
           });
-        }
 
-        const factoryRoom: FactoryRoom = {
-          id: 'room-main',
-          name: 'Main Production Area',
-          roomType: 'stitching',
-          lines,
-        };
-
-        const factoryFloor: FactoryFloorLevel = {
-          id: 'floor-1',
-          floorNumber: 1,
-          name: 'Ground Floor',
-          rooms: [factoryRoom]
-        };
+          return {
+            id: `floor-${floor.id}`,
+            floorNumber: floor.floorNumber,
+            name: floor.name || `Floor ${floor.floorNumber}`,
+            rooms: rooms
+          };
+        });
 
         const building: FactoryBuilding = {
           id: 'bldg-1',
           name: 'Main Production Facility',
-          floors: [factoryFloor],
+          floors: factoryFloors,
         };
 
         setConfig({
@@ -143,14 +168,29 @@ export function useFactoryData(): {
 
     loadData();
     
-    // Auto refresh every 10 seconds
+    // Auto refresh every 30 seconds as fallback reconciliation
     const intervalId = setInterval(() => {
       loadData();
-    }, 10000);
+    }, 30000);
+
+    // Live WebSockets Updates
+    socketService.connect();
+    
+    const handleBundleUpdated = (payload: any) => {
+      // payload contains the bundle update information. We can trigger a localized update
+      // But for simplicity of react state, if a BUNDLE_UPDATED event comes, we can safely just fetch the machines
+      // or optionally do a fast patch if we have the specific data.
+      // Easiest reliable way is to just call loadData() quickly in background when a specific scan happens,
+      // because 400 machines load is very fast natively in this app.
+      loadData();
+    };
+
+    socketService.on('BUNDLE_UPDATED', handleBundleUpdated);
 
     return () => { 
       mounted = false; 
       clearInterval(intervalId);
+      socketService.off('BUNDLE_UPDATED', handleBundleUpdated);
     };
   }, []);
 

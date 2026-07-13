@@ -30,8 +30,8 @@ export const mapMachineTypeAPIToUI = (data: MachineTypeAPIResponse): MachineType
 
 export const machineTypeService = {
   async getMachineTypes() {
-    const { data } = await apiClient.get<{ success: boolean; data: { data: MachineTypeAPIResponse[] } }>('/machine-types');
-    return data.data.data.map(mapMachineTypeAPIToUI);
+    const { data } = await apiClient.get<{ success: boolean; data: MachineTypeAPIResponse[] }>('/machine-types');
+    return data.data.map(mapMachineTypeAPIToUI);
   },
 
   async getMachineType(id: string) {
@@ -62,9 +62,7 @@ export const machineTypeService = {
   },
 
   async deleteMachineType(id: string) {
-    const { data } = await apiClient.patch<{ success: boolean; data: MachineTypeAPIResponse }>(`/machine-types/${id}/status`, {
-      status: 'INACTIVE'
-    });
+    const { data } = await apiClient.delete<{ success: boolean; data: MachineTypeAPIResponse }>(`/machine-types/${id}`);
     return mapMachineTypeAPIToUI(data.data);
   },
 

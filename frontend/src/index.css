@@ -137,3 +137,18 @@
     @apply font-sans;
     }
 }
+
+@layer utilities {
+  .animate-conveyor {
+    animation: conveyor 2s linear infinite;
+  }
+}
+
+@keyframes conveyor {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 22px 0;
+  }
+}

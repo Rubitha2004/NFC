@@ -46,4 +46,9 @@ export const planningService = {
     const res = await apiClient.post("/planning/publish", data);
     return res.data;
   },
+
+  getHistory: async () => {
+    const res = await apiClient.get("/planning/history");
+    return res.data;
+  },
 };

@@ -44,7 +44,6 @@ import type { NavItem } from "@/shared/types";
 const NAV_ITEMS: NavItem[] = [
   { label: "Planning Dashboard", icon: LayoutDashboard, path: "/planning/center" },
   { label: "Planning Board", icon: Kanban, path: "/planning/board" },
-  { label: "Resource Allocation", icon: Map, path: "/planning/resources" },
   { label: "Production Orders", icon: FileText, path: "/production-orders" },
   { label: "Live Factory", icon: Factory, path: "/live-factory" },
   { label: "Factory Layout", icon: Map, path: "/factory-layout" },

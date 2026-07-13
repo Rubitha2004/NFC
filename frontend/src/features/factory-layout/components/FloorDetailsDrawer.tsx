@@ -43,7 +43,8 @@ export function FloorDetailsDrawer({ floor, onClose, onUpdate }: Props) {
       fetchRooms();
       onUpdate();
     } catch (err: any) {
-      alert(err.message || "Failed to delete room.");
+      const errorMessage = err.response?.data?.message || err.message || "Failed to delete room.";
+      alert(errorMessage);
     }
   };
 
@@ -97,9 +98,7 @@ export function FloorDetailsDrawer({ floor, onClose, onUpdate }: Props) {
                     <span className="text-sm text-white/60">
                       <span className="font-bold text-white">{room._count?.machines || 0}</span> Machines Assigned
                     </span>
-                    <Button variant="outline" size="sm" onClick={() => setAssignRoomToMachine(room)}>
-                      Assign Machine
-                    </Button>
+                    {/* The user explicitly requested to decouple machine assignment from floor/room creation, so we hide this or make it less prominent. Usually assignments happen in Planning Board anyway. */}
                   </div>
                 </div>
               ))}

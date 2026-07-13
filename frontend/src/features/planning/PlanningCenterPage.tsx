@@ -5,13 +5,13 @@ import { useProductionOrders } from "../production-order/hooks/useProductionOrde
 import { useLivePlanningResources } from "./hooks/useLivePlanningResources";
 import { useOperations } from "../operation/hooks/useOperations";
 import { usePlanningMutations } from "./hooks/usePlanningMutations";
-import { usePlanningDashboard } from "./hooks/usePlanning";
+import { usePlanningDashboard, usePlanningHistory } from "./hooks/usePlanning";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { OrderStatusBadge } from "../production-order/components/ProductionOrderUIHelpers";
 import type { OrderStatus } from "../production-order/types/production-order.types";
 import { CapacityGauge } from "./components/CapacityGauge";
-import { ResourceAllocationDrawer } from "./components/ResourceAllocationDrawer";
+import { AllocationWizardModal } from "./components/AllocationWizardModal";
 import { BundleTagsModal } from "./components/BundleTagsModal";
 
 export default function PlanningCenterPage() {
@@ -20,6 +20,7 @@ export default function PlanningCenterPage() {
   const { data: operations = [], isLoading: loadingOps } = useOperations();
   const { publishPlan } = usePlanningMutations();
   const { data: metrics, isLoading: loadingMetrics } = usePlanningDashboard();
+  const { data: historyData = [], isLoading: loadingHistory } = usePlanningHistory();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [bundlesCount, setBundlesCount] = useState<number>(1);
@@ -177,7 +178,7 @@ export default function PlanningCenterPage() {
     });
   };
 
-  const isLoading = loadingOrders || loadingResources || loadingOps || loadingMetrics;
+  const isLoading = loadingOrders || loadingResources || loadingOps || loadingMetrics || loadingHistory;
   const isPublishing = publishPlan.isPending;
 
   if (isLoading) {
@@ -275,21 +276,27 @@ export default function PlanningCenterPage() {
         bundles={generatedBundles || []}
       />
 
-      {/* Drawer */}
-      <ResourceAllocationDrawer 
+      {/* Allocation Wizard Modal */}
+      <AllocationWizardModal 
         isOpen={activeOperationId !== null}
         onClose={() => setActiveOperationId(null)}
         operationName={(activeOp as any)?.name || ""}
-        requiredMinutes={activeOpReqMinutes}
-        requiredSkillId={(activeOp as any)?.requiredSkillId}
         availableWorkers={resources?.workers || []}
         availableMachines={resources?.machines || []}
-        selectedWorkerIds={activeOperationId ? (assignments[activeOperationId]?.workerIds || []) : []}
-        selectedMachineIds={activeOperationId ? (assignments[activeOperationId]?.machineIds || []) : []}
-        allSelectedWorkerIds={Object.values(assignments).flatMap(a => a.workerIds)}
-        allSelectedMachineIds={Object.values(assignments).flatMap(a => a.machineIds)}
-        onSelectWorker={(wId) => activeOperationId && handleToggleWorker(activeOperationId, wId)}
-        onSelectMachine={(mId) => activeOperationId && handleToggleMachine(activeOperationId, mId)}
+        initialSelectedWorkerIds={activeOperationId ? (assignments[activeOperationId]?.workerIds || []) : []}
+        initialSelectedMachineIds={activeOperationId ? (assignments[activeOperationId]?.machineIds || []) : []}
+        onSave={(machineIds, workerIds) => {
+          if (activeOperationId) {
+            setAssignments(prev => ({
+              ...prev,
+              [activeOperationId]: {
+                workerIds,
+                machineIds
+              }
+            }));
+            setActiveOperationId(null);
+          }
+        }}
       />
 
       {/* Left Sidebar: PO Queue */}
@@ -362,42 +369,79 @@ export default function PlanningCenterPage() {
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
               
-              {/* Step 1: Operation Routing */}
+              {/* Step 1: Operation Routing & Allocation */}
               <section className="bg-zinc-900 border border-white/10 rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="bg-emerald-500/20 text-emerald-400 p-2 rounded-lg"><CheckSquare className="w-5 h-5" /></div>
                   <div>
-                    <h2 className="text-lg font-bold">1. Define Operation Routing (The Plan)</h2>
-                    <p className="text-xs text-white/50">Select the specific sequence of operations required for this style</p>
+                    <h2 className="text-lg font-bold">1. Define Operation Routing & Allocate</h2>
+                    <p className="text-xs text-white/50">Select operations and allocate workers & machines immediately</p>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {operations.map(op => {
                     const isSelected = selectedOperations.has(Number(op.id));
+                    const alloc = assignments[Number(op.id)] || { workerIds: [], machineIds: [] };
+                    const isMismatched = (alloc?.workerIds?.length || 0) !== (alloc?.machineIds?.length || 0);
+
                     return (
                       <div 
                         key={op.id}
-                        onClick={() => handleToggleOperation(Number(op.id))}
+                        onClick={() => {
+                          handleToggleOperation(Number(op.id));
+                          if (!isSelected) {
+                             setActiveOperationId(Number(op.id));
+                          } else if (isSelected) {
+                             // If already selected, clicking again could either deselect or just open drawer?
+                             // Let's keep toggle behavior, but if they want to allocate more, they can click a button.
+                          }
+                        }}
                         className={cn(
-                          "p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-3",
+                          "p-3 rounded-xl border cursor-pointer transition-all flex flex-col gap-3 relative",
                           isSelected 
                             ? "bg-emerald-500/10 border-emerald-500/50" 
                             : "bg-zinc-950 border-white/5 hover:border-white/20"
                         )}
                       >
-                        <div className={cn(
-                          "w-5 h-5 rounded-md flex items-center justify-center border",
-                          isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/20 bg-zinc-900"
-                        )}>
-                          {isSelected && <CheckSquare className="w-3 h-3" />}
-                        </div>
-                        <div>
-                          <div className={cn("text-sm font-medium", isSelected ? "text-emerald-400" : "text-white/80")}>
-                            {(op as any).name}
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-5 h-5 rounded-md flex items-center justify-center border shrink-0",
+                            isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/20 bg-zinc-900"
+                          )}>
+                            {isSelected && <CheckSquare className="w-3 h-3" />}
                           </div>
-                          <div className="text-[10px] text-white/40 font-mono">{op.operationCode} | SMV: {(op as any).smv}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className={cn("text-sm font-medium truncate", isSelected ? "text-emerald-400" : "text-white/80")}>
+                              {(op as any).name}
+                            </div>
+                            <div className="text-[10px] text-white/40 font-mono">{op.operationCode} | SMV: {(op as any).smv}</div>
+                          </div>
+                          {isSelected && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setActiveOperationId(Number(op.id)); }}
+                              className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded hover:bg-emerald-500/30 transition-colors"
+                            >
+                              Edit
+                            </button>
+                          )}
                         </div>
+
+                        {isSelected && (
+                          <div className="flex items-center justify-between border-t border-emerald-500/20 pt-2 mt-1">
+                            <div className="flex items-center gap-3 text-xs">
+                              <div className="flex items-center gap-1 text-emerald-400/80">
+                                <Users className="w-3 h-3" /> {alloc.workerIds.length}
+                              </div>
+                              <div className="flex items-center gap-1 text-blue-400/80">
+                                <Cpu className="w-3 h-3" /> {alloc.machineIds.length}
+                              </div>
+                            </div>
+                            {isMismatched && (
+                              <ShieldAlert className="w-4 h-4 text-amber-500" title="Workers/Machines mismatch" />
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -455,71 +499,56 @@ export default function PlanningCenterPage() {
                 </div>
               </section>
 
-              {/* Step 3: Dynamic Resource Assignment */}
-              <section className={cn("bg-zinc-900 border border-white/10 rounded-2xl p-6 transition-opacity", selectedOperations.size === 0 && "opacity-50 pointer-events-none")}>
+              {/* Planning History */}
+              <section className="bg-zinc-900 border border-white/10 rounded-2xl p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="bg-purple-500/20 text-purple-400 p-2 rounded-lg"><Cog className="w-5 h-5" /></div>
+                  <div className="bg-purple-500/20 text-purple-400 p-2 rounded-lg"><Clock className="w-5 h-5" /></div>
                   <div>
-                    <h2 className="text-lg font-bold">3. Capacity & Resource Assignment</h2>
-                    <p className="text-xs text-white/50">Dynamically allocate workers to meet target capacities</p>
+                    <h2 className="text-lg font-bold">Planning & Assignment History</h2>
+                    <p className="text-xs text-white/50">Tracking logs for {selectedOrder.orderNumber}</p>
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  {operations.filter(op => selectedOperations.has(Number(op.id))).map(op => {
-                    const reqMins = Math.ceil(selectedOrder.targetQuantity * (op as any).smv);
-                    const alloc = assignments[Number(op.id)] || { workerIds: [], machineIds: [] };
-                    const isMismatched = (alloc?.workerIds?.length || 0) !== (alloc?.machineIds?.length || 0);
-                    
-                    return (
-                      <div key={op.id} className="bg-zinc-950 border border-white/5 rounded-xl p-4 flex items-center gap-6">
-                        <div className="w-1/4 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded bg-zinc-800 flex items-center justify-center text-white/50">
-                            <Settings2 className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-sm text-white">{(op as any).name}</div>
-                            <div className="text-xs text-white/40">{op.operationCode} | SMV: {(op as any).smv}</div>
-                          </div>
-                        </div>
-
-                        <div className="w-2/5 flex items-center">
-                           <CapacityGauge 
-                             requiredMinutes={reqMins} 
-                             assignedWorkersCount={alloc?.workerIds?.length || 0} 
-                           />
-                        </div>
-
-                        <div className="flex-1 flex justify-end items-center gap-4">
-                          <div className="flex items-center gap-4 text-xs text-white/60">
-                            <div className="flex items-center gap-1">
-                              <Users className="w-3 h-3 text-emerald-500" /> {alloc?.workerIds?.length || 0}
+                
+                <div className="space-y-3">
+                  {historyData.filter((h: any) => h.bundle?.productionOrderId === Number(selectedOrder.id)).length > 0 ? (
+                    historyData
+                      .filter((h: any) => h.bundle?.productionOrderId === Number(selectedOrder.id))
+                      .slice(0, 5)
+                      .map((log: any) => (
+                        <div key={log.id} className="p-4 bg-zinc-950 border border-white/5 rounded-xl flex flex-col gap-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-mono">
+                                Tag: {log.tag?.tagCode || 'N/A'}
+                              </span>
+                              <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">
+                                Bundle: {log.bundle?.bundleNumber}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <Cpu className="w-3 h-3 text-blue-500" /> {alloc?.machineIds?.length || 0}
-                            </div>
+                            <span className="text-[10px] text-white/40">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
                           
-                          {isMismatched && (
-                            <div title="Workers and Machines count mismatch" className="text-amber-500">
-                              <ShieldAlert className="w-4 h-4" />
+                          <div className="flex items-center gap-2 text-sm mt-1">
+                            <span className="text-white/60">Operation:</span>
+                            <span className="text-white font-medium">{log.operation?.name || log.operation?.operationName || 'Unknown'}</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-4 text-sm mt-1 bg-white/5 p-2 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Users className="w-4 h-4 text-emerald-500" />
+                              <span className="text-white/80">{log.operator ? `${log.operator.firstName} ${log.operator.lastName}` : 'System Assigned'}</span>
                             </div>
-                          )}
-
-                          <button 
-                            onClick={() => setActiveOperationId(Number(op.id))}
-                            className="bg-white/5 hover:bg-white/10 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors border border-white/10"
-                          >
-                            Allocate
-                          </button>
+                            <div className="flex items-center gap-2">
+                              <Cpu className="w-4 h-4 text-blue-500" />
+                              <span className="text-white/80">Assigned Machine</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                  
-                  {selectedOperations.size === 0 && (
-                    <div className="text-center py-6 text-white/40 text-sm border border-dashed border-white/10 rounded-xl">
-                      Select operations in Step 1 to begin resource allocation.
+                      ))
+                  ) : (
+                    <div className="text-center py-8 text-white/40 text-sm border border-dashed border-white/10 rounded-xl">
+                      <Clock className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                      No history found for this order. Assignments and tracking logs will appear here once published.
                     </div>
                   )}
                 </div>

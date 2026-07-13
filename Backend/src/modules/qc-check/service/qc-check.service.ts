@@ -46,60 +46,85 @@ export class QCCheckService {
   }
 
   async create(dto: CreateQCCheckDTO) {
-    const [bundle, qcPerson] = await Promise.all([
-      prisma.bundle.findUnique({ where: { id: dto.bundleId } }),
-      prisma.worker.findUnique({ where: { id: dto.qcPersonId } }),
-    ]);
-    if (!bundle) throw new Error('Bundle not found');
-    if (!qcPerson) throw new Error('QC person (worker) not found');
+    return prisma.$transaction(async (tx) => {
+      const [bundle, qcPerson] = await Promise.all([
+        tx.bundle.findUnique({ where: { id: dto.bundleId } }),
+        tx.worker.findUnique({ where: { id: dto.qcPersonId } }),
+      ]);
+      if (!bundle) throw new Error('Bundle not found');
+      if (!qcPerson) throw new Error('QC person (worker) not found');
 
-    if (dto.operationId) {
-      const op = await prisma.operation.findUnique({ where: { id: dto.operationId } });
-      if (!op) throw new Error('Operation not found');
-    }
-    if (dto.workerId) {
-      const w = await prisma.worker.findUnique({ where: { id: dto.workerId } });
-      if (!w) throw new Error('Worker being audited not found');
-    }
+      if (dto.operationId) {
+        const op = await tx.operation.findUnique({ where: { id: dto.operationId } });
+        if (!op) throw new Error('Operation not found');
+      }
+      if (dto.workerId) {
+        const w = await tx.worker.findUnique({ where: { id: dto.workerId } });
+        if (!w) throw new Error('Worker being audited not found');
+      }
 
-    const check = await repo.create({
-      bundleId: dto.bundleId,
-      tagId: dto.tagId,
-      qcPersonId: dto.qcPersonId,
-      qcTier: dto.qcTier as QCTier,
-      operationId: dto.operationId,
-      workerId: dto.workerId,
-      status: dto.status as QCCheckStatus,
-      defectNotes: dto.defectNotes,
-    });
+      // Idempotency guard
+      if (dto.qcTier === 'FINAL_QC' && dto.status === 'PASS' && bundle.status === 'QC_COMPLETED') {
+        throw new Error('Bundle already QC completed — duplicate scan ignored');
+      }
 
-    // If final QC passed, mark bundle as QC_COMPLETED and auto-release the tag
-    if (dto.qcTier === 'FINAL_QC' && dto.status === 'PASS') {
-      await prisma.bundle.update({ 
-        where: { id: dto.bundleId }, 
-        data: { 
-          status: 'QC_COMPLETED',
-          completedQuantity: { increment: bundle.quantity }
-        } 
+      // We use tx.qCCheckLog directly since we are inside a transaction
+      const check = await tx.qCCheckLog.create({
+        data: {
+          bundleId: dto.bundleId,
+          tagId: dto.tagId,
+          qcPersonId: dto.qcPersonId,
+          qcTier: dto.qcTier as QCTier,
+          operationId: dto.operationId,
+          workerId: dto.workerId,
+          status: dto.status as QCCheckStatus,
+          defectNotes: dto.defectNotes,
+          passQuantity: dto.passQuantity,
+          rejectQuantity: dto.rejectQuantity,
+          reworkQuantity: dto.reworkQuantity,
+        }
       });
-      
-      if (dto.tagId) {
-        await prisma.bundleTagAssignment.update({
-          where: { id: dto.tagId },
-          data: {
-            bundleId: null,
-            status: 'AVAILABLE',
-            releasedAt: new Date()
-          }
+
+      // If final QC passed, mark bundle as QC_COMPLETED and auto-release the tag
+      if (dto.qcTier === 'FINAL_QC' && dto.status === 'PASS') {
+        const passedQty = dto.passQuantity ?? bundle.quantity;
+        
+        await tx.bundle.update({ 
+          where: { id: dto.bundleId }, 
+          data: { 
+            status: 'QC_COMPLETED',
+            completedQuantity: { increment: passedQty }
+          } 
+        });
+        
+        if (dto.tagId) {
+          await tx.bundleTagAssignment.update({
+            where: { id: dto.tagId },
+            data: {
+              bundleId: null,
+              status: 'AVAILABLE',
+              releasedAt: new Date()
+            }
+          });
+        }
+
+        // Bug 2 Fix: Order completion tracking
+        const order = await tx.productionOrder.update({
+          where: { id: bundle.productionOrderId },
+          data: { completedQuantity: { increment: passedQty } }
+        });
+        
+        if (order.completedQuantity >= order.plannedQuantity) {
+          await tx.productionOrder.update({ where: { id: order.id }, data: { status: 'COMPLETED' } });
+        }
+      } else if (dto.status === 'REWORK' || dto.status === 'FAIL') {
+        await tx.bundle.update({
+          where: { id: dto.bundleId },
+          data: { status: 'REWORK' }
         });
       }
-    } else if (dto.status === 'REWORK' || dto.status === 'FAIL') {
-      await prisma.bundle.update({
-        where: { id: dto.bundleId },
-        data: { status: 'REWORK' }
-      });
-    }
 
-    return check;
+      return check;
+    });
   }
 }

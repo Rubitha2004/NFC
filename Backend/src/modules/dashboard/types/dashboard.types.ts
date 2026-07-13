@@ -24,7 +24,6 @@ export interface BundlesSummary {
   created: number;
   inProgress: number;
   completed: number;
-  qcPending: number;
 }
 
 export interface QCSummary {

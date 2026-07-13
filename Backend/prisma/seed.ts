@@ -395,6 +395,24 @@ async function main() {
     } catch (e) { /* skip */ }
   }
 
+  // =============================================
+  // 8. BUNDLE TAGS
+  // =============================================
+  console.log('Creating bundle tags...');
+  for (let i = 1; i <= 500; i++) {
+    const tagCode = `TAG-RFID-${i.toString().padStart(4, '0')}`;
+    try {
+      await prisma.bundleTagAssignment.upsert({
+        where: { tagCode },
+        update: {},
+        create: {
+          tagCode,
+          status: 'AVAILABLE'
+        }
+      });
+    } catch (e) { /* skip */ }
+  }
+
   console.log('✅ Comprehensive seed completed!');
   console.log('Summary:');
   console.log(`  - 4 Departments`);

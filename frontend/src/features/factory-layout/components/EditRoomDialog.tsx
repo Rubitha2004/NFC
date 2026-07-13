@@ -59,7 +59,8 @@ export function EditRoomDialog({ isOpen, room, onClose, onSuccess }: Props) {
       onSuccess();
       onClose();
     } catch (err: any) {
-      alert(err.message || "Failed to update room.");
+      const errorMessage = err.response?.data?.message || err.message || "Failed to update room.";
+      alert(errorMessage);
     }
   };
 

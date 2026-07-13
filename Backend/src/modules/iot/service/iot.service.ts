@@ -47,7 +47,7 @@ export class IotService {
 
         const updatedBundle = await tx.bundle.update({
           where: { id: tag.bundle.id },
-          data: { status: isFinalOperation ? "QC_PENDING" : "IN_PROGRESS" }
+          data: { status: isFinalOperation ? "WAITING" : "IN_PROGRESS" }
         });
 
         const task = await tx.productionTask.findFirst({

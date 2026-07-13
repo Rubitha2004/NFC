@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const stage_log_controller_1 = require("../controller/stage-log.controller");
+const router = (0, express_1.Router)();
+const ctrl = new stage_log_controller_1.StageLogController();
+router.get('/', ctrl.getAll.bind(ctrl));
+router.get('/bundle/:bundleId', ctrl.getByBundle.bind(ctrl));
+router.post('/scan-in', ctrl.scanIn.bind(ctrl));
+router.post('/:id/scan-out', ctrl.scanOut.bind(ctrl));
+exports.default = router;

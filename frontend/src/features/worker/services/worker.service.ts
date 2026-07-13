@@ -66,9 +66,10 @@ export const mapWorkerAPIToUI = (data: WorkerAPIResponse): WorkerData => {
     shift: 'Morning', // Mocked shift as it's not strictly on Worker model directly
     nfcCardId: data.nfcCardId || '',
     currentAssignment: data.assignments && data.assignments.length > 0 ? {
-      machineId: data.assignments[0].machine?.machineCode || `MAC-${data.assignments[0].machineId}`,
-      operationName: data.assignments[0].operation?.operationName || 'Assigned Operation',
-      status: 'active'
+      machineId: data.assignments[0].machine?.machineCode || `MAC-${(data.assignments[0] as any).machineId}`,
+      operation: (data.assignments[0] as any).operation?.operationName || 'Assigned Operation',
+      status: 'active' as const,
+      assignedAt: new Date()
     } : undefined,
     joiningDate: new Date(data.createdAt),
     status: (data.status?.toLowerCase() || 'active') as WorkerStatus,

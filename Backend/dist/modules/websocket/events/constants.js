@@ -20,7 +20,15 @@ exports.WEBSOCKET_EVENTS = {
     QC_COMPLETED: 'qc.completed',
     QC_FAILED: 'qc.failed',
     QC_UPDATED: 'qc.updated',
+    // Worker master data
+    WORKER_CREATED: 'worker.created',
+    WORKER_UPDATED: 'worker.updated',
+    WORKER_STATUS_CHANGED: 'worker.status_changed',
+    // Skill assignment
+    SKILL_ASSIGNED: 'skill.assigned',
+    SKILL_REVOKED: 'skill.revoked',
     // Machine
+    MACHINE_CREATED: 'machine.created',
     MACHINE_ONLINE: 'machine.online',
     MACHINE_OFFLINE: 'machine.offline',
     MACHINE_IDLE: 'machine.idle',

@@ -33,6 +33,41 @@ export class MachineService {
       throw new Error("Terminal does not exist");
     }
 
+    if (data.roomId && (!data.rowIndex || !data.positionIndex)) {
+      const prisma = require("../../../config/prisma").default;
+      const room = await prisma.room.findUnique({ where: { id: data.roomId } });
+      if (room) {
+        const machinesInRoom = await prisma.machine.findMany({ 
+          where: { roomId: data.roomId },
+          select: { rowIndex: true, positionIndex: true }
+        });
+        
+        let newRowIndex = 0;
+        let newPosIndex = 0;
+        
+        while (true) {
+          const occupied = machinesInRoom.some((m: any) => m.rowIndex === newRowIndex && m.positionIndex === newPosIndex);
+          if (!occupied) break;
+          
+          newPosIndex++;
+          if (newPosIndex >= room.machinesPerRow) {
+            newPosIndex = 0;
+            newRowIndex++;
+          }
+        }
+
+        data.rowIndex = newRowIndex;
+        data.positionIndex = newPosIndex;
+
+        if (newRowIndex >= room.rowsCount) {
+          await prisma.room.update({
+            where: { id: room.id },
+            data: { rowsCount: newRowIndex + 1 }
+          });
+        }
+      }
+    }
+
     const machine = await this.repository.create(data);
     websocketService.publish(WEBSOCKET_EVENTS.MACHINE_CREATED, machine);
     return machine;
@@ -113,19 +148,42 @@ export class MachineService {
       throw new Error("Machine not found");
     }
 
-    if (data.roomId && (!data.rowIndex || !data.positionIndex)) {
+    if (data.roomId && data.rowIndex && data.positionIndex) {
+      const prisma = require("../../../config/prisma").default;
+      const clash = await prisma.machine.findFirst({
+        where: { roomId: data.roomId, rowIndex: data.rowIndex, positionIndex: data.positionIndex, id: { not: id } }
+      });
+      if (clash) throw new Error(`Position already occupied by ${clash.machineCode || clash.machineName}`);
+    } else if (data.roomId && (!data.rowIndex || !data.positionIndex)) {
       const prisma = require("../../../config/prisma").default;
       const room = await prisma.room.findUnique({ where: { id: data.roomId } });
       if (room) {
-        const count = await prisma.machine.count({ where: { roomId: data.roomId } });
+        // Find the maximum row and position used, or scan for first empty spot
+        // The most robust way is to find all occupied spots and pick the next logical one.
+        const machinesInRoom = await prisma.machine.findMany({ 
+          where: { roomId: data.roomId },
+          select: { rowIndex: true, positionIndex: true }
+        });
         
-        const newRowIndex = Math.floor(count / room.machinesPerRow) + 1;
-        const newPosIndex = (count % room.machinesPerRow) + 1;
+        let newRowIndex = 0;
+        let newPosIndex = 0;
+        
+        // Find first empty slot starting from row 0, pos 0
+        while (true) {
+          const occupied = machinesInRoom.some((m: any) => m.rowIndex === newRowIndex && m.positionIndex === newPosIndex);
+          if (!occupied) break;
+          
+          newPosIndex++;
+          if (newPosIndex >= room.machinesPerRow) {
+            newPosIndex = 0;
+            newRowIndex++;
+          }
+        }
 
         data.rowIndex = newRowIndex;
         data.positionIndex = newPosIndex;
 
-        if (newRowIndex > room.rowsCount) {
+        if (newRowIndex >= room.rowsCount) {
           await prisma.room.update({
             where: { id: room.id },
             data: { rowsCount: newRowIndex }

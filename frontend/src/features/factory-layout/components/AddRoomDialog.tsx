@@ -42,7 +42,8 @@ export function AddRoomDialog({ isOpen, floorId, onClose, onSuccess }: Props) {
       onSuccess();
       onClose();
     } catch (err: any) {
-      alert(err.message || "Failed to create room.");
+      const errorMessage = err.response?.data?.message || err.message || "Failed to create room.";
+      alert(errorMessage);
     }
   };
 

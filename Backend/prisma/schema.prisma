@@ -48,33 +48,7 @@ model Attendance {
   @@map("attendances")
 }
 
-model BundleTransaction {
-  id                Int             @id @default(autoincrement())
-  bundleId          Int
-  productionOrderId Int
-  fromOperationId   Int?
-  toOperationId     Int?
-  fromWorkerId      Int?
-  toWorkerId        Int?
-  fromMachineId     Int?
-  toMachineId       Int?
-  quantity          Int
-  transactionType   TransactionType
-  transactionTime   DateTime        @default(now())
-  remarks           String?
-  createdAt         DateTime        @default(now())
-  bundle            Bundle          @relation(fields: [bundleId], references: [id])
-  fromMachine       Machine?        @relation("BundleTransactionsFromMachine", fields: [fromMachineId], references: [id])
-  fromOperation     Operation?      @relation("BundleTransactionsFromOperation", fields: [fromOperationId], references: [id])
-  fromWorker        Worker?         @relation("BundleTransactionsFromWorker", fields: [fromWorkerId], references: [id])
-  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id])
-  toMachine         Machine?        @relation("BundleTransactionsToMachine", fields: [toMachineId], references: [id])
-  toOperation       Operation?      @relation("BundleTransactionsToOperation", fields: [toOperationId], references: [id])
-  toWorker          Worker?         @relation("BundleTransactionsToWorker", fields: [toWorkerId], references: [id])
-  qcInspections     QC[]
 
-  @@map("bundle_transactions")
-}
 
 model Bundle {
   id                 Int                   @id @default(autoincrement())
@@ -88,12 +62,12 @@ model Bundle {
   status             BundleStatus          @default(CREATED)
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
-  bundleTransactions BundleTransaction[]
+
   currentMachine     Machine?              @relation(fields: [currentMachineId], references: [id])
   currentOperation   Operation?            @relation(fields: [currentOperationId], references: [id])
   currentWorker      Worker?               @relation(fields: [currentWorkerId], references: [id])
   productionOrder    ProductionOrder       @relation(fields: [productionOrderId], references: [id])
-  qcInspections      QC[]
+
   productionTasks    ProductionTask[]
   tagAssignments     BundleTagAssignment[]
   stageLogs          BundleStageLog[]
@@ -143,8 +117,8 @@ model Machine {
   updatedAt                     DateTime                     @updatedAt
   assignments                   Assignment[]
   attendances                   Attendance[]
-  bundleTransactionsFromMachine BundleTransaction[]          @relation("BundleTransactionsFromMachine")
-  bundleTransactionsToMachine   BundleTransaction[]          @relation("BundleTransactionsToMachine")
+
+
   bundles                       Bundle[]
   department                    Department                   @relation(fields: [departmentId], references: [id])
   machineType                   MachineType                  @relation(fields: [machineTypeId], references: [id])
@@ -153,10 +127,11 @@ model Machine {
   rowIndex                      Int?
   positionIndex                 Int?
   room                          Room?                        @relation(fields: [roomId], references: [id])
-  qcInspections                 QC[]
+
   productionTasks               ProductionTask[]
   machineOperationAssignments   MachineOperationAssignment[]
 
+  @@unique([roomId, rowIndex, positionIndex])
   @@map("machines")
 }
 
@@ -171,8 +146,8 @@ model Operation {
   createdAt                       DateTime                     @default(now())
   updatedAt                       DateTime                     @updatedAt
   assignments                     Assignment[]
-  bundleTransactionsFromOperation BundleTransaction[]          @relation("BundleTransactionsFromOperation")
-  bundleTransactionsToOperation   BundleTransaction[]          @relation("BundleTransactionsToOperation")
+
+
   bundles                         Bundle[]
   productionTasks                 ProductionTask[]
   stageLogs                       BundleStageLog[]
@@ -201,33 +176,14 @@ model ProductionOrder {
   remarks            String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
-  bundleTransactions BundleTransaction[]
+
   bundles            Bundle[]
   productionTasks    ProductionTask[]
 
   @@map("production_orders")
 }
 
-model QC {
-  id             Int               @id @default(autoincrement())
-  bundleId       Int
-  transactionId  Int
-  workerId       Int?
-  machineId      Int?
-  inspectorName  String?
-  passQuantity   Int
-  rejectQuantity Int
-  reworkQuantity Int
-  inspectionTime DateTime          @default(now())
-  remarks        String?
-  createdAt      DateTime          @default(now())
-  bundle         Bundle            @relation(fields: [bundleId], references: [id])
-  machine        Machine?          @relation(fields: [machineId], references: [id])
-  transaction    BundleTransaction @relation(fields: [transactionId], references: [id])
-  worker         Worker?           @relation(fields: [workerId], references: [id])
 
-  @@map("qc_inspections")
-}
 
 model Shift {
   id                          Int                          @id @default(autoincrement())
@@ -327,10 +283,10 @@ model Worker {
   updatedAt                    DateTime            @updatedAt
   assignments                  Assignment[]
   attendances                  Attendance[]
-  bundleTransactionsFromWorker BundleTransaction[] @relation("BundleTransactionsFromWorker")
-  bundleTransactionsToWorker   BundleTransaction[] @relation("BundleTransactionsToWorker")
+
+
   bundles                      Bundle[]
-  qcInspections                QC[]
+
   skills                       WorkerSkill[]
   department                   Department          @relation(fields: [departmentId], references: [id])
   grade                        WorkerGrade         @relation(fields: [gradeId], references: [id])
@@ -357,7 +313,6 @@ enum BundleStatus {
   IN_PROGRESS
   WAITING
   COMPLETED
-  QC_PENDING
   QC_COMPLETED
   REWORK
   HOLD
@@ -382,7 +337,6 @@ enum TransactionType {
   TRANSFER
   HOLD
   REWORK
-  QC
   FINISHED
 }
 
@@ -427,8 +381,6 @@ enum TaskStatus {
   ACCEPTED
   RUNNING
   COMPLETED
-  QC
-  TRANSFERRED
   CLOSED
 }
 
@@ -487,6 +439,9 @@ model QCCheckLog {
   workerId    Int?
   status      QCCheckStatus
   defectNotes String?
+  passQuantity   Int           @default(0)
+  rejectQuantity Int           @default(0)
+  reworkQuantity Int           @default(0)
   checkedAt   DateTime      @default(now())
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

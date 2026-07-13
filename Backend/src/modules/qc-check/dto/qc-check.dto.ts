@@ -9,6 +9,9 @@ export const CreateQCCheckSchema = z.object({
   workerId: z.number().int().positive().optional(),
   status: z.enum(['PASS', 'FAIL', 'REWORK']),
   defectNotes: z.string().optional(),
+  passQuantity: z.number().int().nonnegative().optional().default(0),
+  rejectQuantity: z.number().int().nonnegative().optional().default(0),
+  reworkQuantity: z.number().int().nonnegative().optional().default(0),
 });
 
 export type CreateQCCheckDTO = z.infer<typeof CreateQCCheckSchema>;

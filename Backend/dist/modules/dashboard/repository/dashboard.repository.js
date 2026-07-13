@@ -27,18 +27,19 @@ class DashboardRepository {
             // Machine summary metrics
             prisma_1.default.machine.count({ where: { status: 'ACTIVE' } }),
             prisma_1.default.terminal.count({
-                where: { lastHeartbeat: { lt: fiveMinsAgo } }
+                where: {
+                    OR: [
+                        { lastHeartbeat: null },
+                        { lastHeartbeat: { lt: fiveMinsAgo } }
+                    ]
+                }
             }),
             // Production summary metrics
             prisma_1.default.productionOrder.findMany({
                 where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } }
             }),
-            prisma_1.default.bundleTransaction.aggregate({
-                _sum: { quantity: true },
-                where: {
-                    transactionTime: { gte: startOfToday },
-                    transactionType: 'COMPLETE'
-                }
+            prisma_1.default.bundleStageLog.count({
+                where: { outTime: { gte: startOfToday } }
             }),
             // Bundle summary metrics
             prisma_1.default.bundle.groupBy({
@@ -47,13 +48,11 @@ class DashboardRepository {
                 orderBy: { status: 'asc' }
             }),
             // QC summary metrics
-            prisma_1.default.qC.aggregate({
-                _sum: {
-                    passQuantity: true,
-                    rejectQuantity: true,
-                    reworkQuantity: true
-                },
-                where: { inspectionTime: { gte: startOfToday } }
+            prisma_1.default.qCCheckLog.groupBy({
+                by: ['status'],
+                _count: { id: true },
+                where: { checkedAt: { gte: startOfToday } },
+                orderBy: { status: 'asc' }
             })
         ]);
         return {
@@ -63,7 +62,7 @@ class DashboardRepository {
             totalMachines,
             offlineTerminals,
             productionOrders,
-            todaysCompletedQuantity: todaysTransactions._sum.quantity || 0,
+            todaysCompletedQuantity: todaysTransactions,
             bundlesGrouped,
             qcAggregate
         };

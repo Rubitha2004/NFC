@@ -11,13 +11,39 @@ class ProductionOrderRepository {
     }
     async findAll() {
         return prisma_1.default.productionOrder.findMany({
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            include: {
+                productionTasks: {
+                    select: {
+                        workerId: true,
+                        machineId: true,
+                        worker: { select: { firstName: true, lastName: true, employeeCode: true } },
+                        machine: { select: { machineName: true, machineCode: true } }
+                    }
+                },
+                _count: {
+                    select: { bundles: true }
+                }
+            }
         });
     }
     async findById(id) {
         return prisma_1.default.productionOrder.findUnique({
             where: { id },
-            include: { bundles: true }
+            include: {
+                bundles: true,
+                productionTasks: {
+                    select: {
+                        workerId: true,
+                        machineId: true,
+                        worker: { select: { firstName: true, lastName: true, employeeCode: true } },
+                        machine: { select: { machineName: true, machineCode: true } }
+                    }
+                },
+                _count: {
+                    select: { bundles: true }
+                }
+            }
         });
     }
     async findByOrderNumber(orderNumber) {

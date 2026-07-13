@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AssignmentService = void 0;
+const prisma_1 = __importDefault(require("../../../config/prisma"));
 const assignment_repository_1 = require("../repository/assignment.repository");
 const worker_repository_1 = require("../../worker/repository/worker.repository");
 const machine_repository_1 = require("../../machine/repository/machine.repository");
@@ -22,49 +26,63 @@ class AssignmentService {
         this.shiftRepo = new shift_repository_1.ShiftRepository();
     }
     async createAssignment(data) {
-        const { workerId, machineId, operationId, shiftId, assignedBy, remarks } = data;
-        // 1. Verify all entities exist and are active
-        const worker = await this.workerRepo.findById(workerId);
-        if (!worker || worker.status !== client_1.RecordStatus.ACTIVE) {
-            throw new Error("Worker not found or not active");
-        }
-        const machine = await this.machineRepo.findById(machineId);
-        if (!machine || machine.status !== client_1.RecordStatus.ACTIVE) {
-            throw new Error("Machine not found or not active");
-        }
-        const operation = await this.operationRepo.findById(operationId);
-        if (!operation || operation.status !== client_1.RecordStatus.ACTIVE) {
-            throw new Error("Operation not found or not active");
-        }
-        const shift = await this.shiftRepo.findById(shiftId);
-        if (!shift || shift.status !== client_1.RecordStatus.ACTIVE) {
-            throw new Error("Shift not found or not active");
-        }
-        // 2. Worker Reassignment logic:
-        // If worker moves to a new machine, automatically release the old assignment
-        const existingWorkerAssignment = await this.assignmentRepo.findActiveWorkerAssignment(workerId, shiftId);
-        if (existingWorkerAssignment) {
-            // Release it
-            await this.assignmentRepo.releaseAssignment(existingWorkerAssignment.id);
-        }
-        // 3. Machine availability logic:
-        // One machine can have only one active worker in a shift. Option 1: Reject if occupied.
-        const existingMachineAssignment = await this.assignmentRepo.findActiveMachineAssignment(machineId, shiftId);
-        if (existingMachineAssignment) {
-            throw new Error("Machine is already assigned to another worker in this shift");
-        }
-        // 4. Create new Assignment
-        const assignment = await this.assignmentRepo.create({
-            workerId,
-            machineId,
-            operationId,
-            shiftId,
-            assignedBy,
-            remarks,
-            status: client_1.AssignmentStatus.ACTIVE,
+        return prisma_1.default.$transaction(async (tx) => {
+            const [worker, machine, operation, shift] = await Promise.all([
+                tx.worker.findUnique({ where: { id: data.workerId } }),
+                tx.machine.findUnique({ where: { id: data.machineId } }),
+                tx.operation.findUnique({ where: { id: data.operationId }, include: { requiredSkill: true } }),
+                tx.shift.findUnique({ where: { id: data.shiftId } }),
+            ]);
+            if (!worker || worker.status !== client_1.RecordStatus.ACTIVE)
+                throw new Error("Worker not found or not active");
+            if (!machine || machine.status !== client_1.RecordStatus.ACTIVE)
+                throw new Error("Machine not found or not active");
+            if (!operation || operation.status !== client_1.RecordStatus.ACTIVE)
+                throw new Error("Operation not found or not active");
+            if (!shift || shift.status !== client_1.RecordStatus.ACTIVE)
+                throw new Error("Shift not found or not active");
+            if (operation.requiredSkillId) {
+                const hasSkill = await tx.workerSkill.findUnique({
+                    where: { workerId_skillId: { workerId: data.workerId, skillId: operation.requiredSkillId } }
+                });
+                if (!hasSkill) {
+                    throw new Error(`Worker does not have the required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`);
+                }
+            }
+            // reject if machine already occupied THIS shift — locked inside the same tx
+            const machineBusy = await tx.assignment.findFirst({
+                where: { machineId: data.machineId, shiftId: data.shiftId, status: client_1.AssignmentStatus.ACTIVE }
+            });
+            if (machineBusy)
+                throw new Error("Machine is already assigned in this shift");
+            // release worker's existing active assignment
+            await tx.assignment.updateMany({
+                where: { workerId: data.workerId, status: client_1.AssignmentStatus.ACTIVE },
+                data: { status: client_1.AssignmentStatus.COMPLETED, releasedAt: new Date() }
+            });
+            const assignment = await tx.assignment.create({
+                data: {
+                    workerId: data.workerId,
+                    machineId: data.machineId,
+                    operationId: data.operationId,
+                    shiftId: data.shiftId,
+                    assignedBy: data.assignedBy,
+                    remarks: data.remarks,
+                    status: client_1.AssignmentStatus.ACTIVE,
+                }
+            });
+            return assignment;
+        }, { isolationLevel: "Serializable" })
+            .then((assignment) => {
+            websocket_1.websocketService.publish(websocket_1.WEBSOCKET_EVENTS.ASSIGNMENT_CREATED, assignment);
+            return assignment;
+        })
+            .catch((error) => {
+            if (error.code === 'P2034') {
+                throw new Error("Transaction conflict occurred. Please retry.");
+            }
+            throw error;
         });
-        websocket_1.websocketService.publish(websocket_1.WEBSOCKET_EVENTS.ASSIGNMENT_CREATED, assignment);
-        return assignment;
     }
     async getAllAssignments(params) {
         return this.assignmentRepo.findAll(params);

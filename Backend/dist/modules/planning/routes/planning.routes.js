@@ -12,4 +12,5 @@ router.get("/tasks/:id", planning_controller_1.planningController.getTaskById);
 router.patch("/tasks/:id", planning_controller_1.planningController.updateTask);
 router.post("/scheduler/auto/:id", planning_controller_1.planningController.runAutoScheduler);
 router.post("/publish", planning_controller_1.planningController.publishPlan);
+router.get("/history", planning_controller_1.planningController.getHistory);
 exports.planningRoutes = router;

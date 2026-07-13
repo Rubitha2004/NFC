@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const qc_check_controller_1 = require("../controller/qc-check.controller");
+const router = (0, express_1.Router)();
+const ctrl = new qc_check_controller_1.QCCheckController();
+router.get('/', ctrl.getAll.bind(ctrl));
+router.get('/bundle/:bundleId', ctrl.getByBundle.bind(ctrl));
+router.get('/bundle/:bundleId/trail', ctrl.getAccountabilityTrail.bind(ctrl));
+router.post('/scan', ctrl.scan.bind(ctrl));
+router.get('/:id', ctrl.getById.bind(ctrl));
+router.post('/', ctrl.create.bind(ctrl));
+exports.default = router;

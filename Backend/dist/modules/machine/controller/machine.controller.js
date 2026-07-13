@@ -112,5 +112,23 @@ class MachineController {
             });
         }
     };
+    assignRoom = async (req, res, next) => {
+        try {
+            const id = Number(req.params.id);
+            const data = machine_validation_1.assignMachineRoomSchema.parse(req.body);
+            const machine = await this.service.assignRoom(id, data);
+            return res.status(200).json({
+                success: true,
+                message: "Machine assigned to room successfully",
+                data: machine,
+            });
+        }
+        catch (error) {
+            return res.status(400).json({
+                success: false,
+                message: error.message || "Failed to assign machine room",
+            });
+        }
+    };
 }
 exports.MachineController = MachineController;

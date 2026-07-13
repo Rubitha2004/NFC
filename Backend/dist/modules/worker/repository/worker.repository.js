@@ -42,6 +42,10 @@ class WorkerRepository {
                         include: {
                             skill: true
                         }
+                    },
+                    assignments: {
+                        where: { status: "ACTIVE" },
+                        include: { machine: true, operation: true }
                     }
                 }
             })
@@ -63,6 +67,10 @@ class WorkerRepository {
                     include: {
                         skill: true
                     }
+                },
+                assignments: {
+                    where: { status: "ACTIVE" },
+                    include: { machine: true, operation: true }
                 }
             }
         });

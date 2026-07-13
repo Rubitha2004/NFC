@@ -9,7 +9,7 @@ const STATUS_MAP: Record<
   { label: string; cls: string; dot: string }
 > = {
   running: {
-    label: "Running",
+    label: "Assigned",
     cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     dot: "bg-emerald-500 animate-pulse",
   },
@@ -19,7 +19,7 @@ const STATUS_MAP: Record<
     dot: "bg-amber-400",
   },
   offline: {
-    label: "Offline",
+    label: "Not Assigned",
     cls: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
     dot: "bg-zinc-500",
   },

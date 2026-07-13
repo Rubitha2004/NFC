@@ -42,7 +42,7 @@ class DashboardService {
             efficiency
         };
         // Map Bundles Summary
-        let created = 0, inProgress = 0, completedBundles = 0, qcPending = 0;
+        let created = 0, inProgress = 0, completedBundles = 0;
         data.bundlesGrouped.forEach((b) => {
             if (b.status === 'CREATED' || b.status === 'WAITING')
                 created += b._count.id;
@@ -50,20 +50,26 @@ class DashboardService {
                 inProgress += b._count.id;
             if (b.status === 'COMPLETED')
                 completedBundles += b._count.id;
-            if (b.status === 'QC_PENDING')
-                qcPending += b._count.id;
         });
         const bundles = {
             created,
             inProgress,
-            completed: completedBundles,
-            qcPending
+            completed: completedBundles
         };
         // Map QC Summary
+        let pass = 0, reject = 0, rework = 0;
+        data.qcAggregate.forEach((q) => {
+            if (q.status === 'PASS')
+                pass += q._count.id;
+            if (q.status === 'REJECT')
+                reject += q._count.id;
+            if (q.status === 'REWORK')
+                rework += q._count.id;
+        });
         const qc = {
-            pass: data.qcAggregate._sum.passQuantity || 0,
-            reject: data.qcAggregate._sum.rejectQuantity || 0,
-            rework: data.qcAggregate._sum.reworkQuantity || 0
+            pass,
+            reject,
+            rework
         };
         return {
             workers,
