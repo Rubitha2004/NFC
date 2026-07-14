@@ -4,7 +4,9 @@
   "description": "NFC Production Dashboard Backend",
   "private": true,
   "type": "commonjs",
+  
   "scripts": {
+    
     "dev": "concurrently \"tsx watch src/server.ts\" \"npm run prisma:watch\"",
     "build": "tsc",
     "start": "node dist/server.js",
