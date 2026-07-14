@@ -48,6 +48,19 @@ export class FloorRepository {
   }
 
   async delete(id: number) {
+    const rooms = await prisma.room.findMany({ where: { floorId: id } });
+    const roomIds = rooms.map(r => r.id);
+    
+    if (roomIds.length > 0) {
+      await prisma.machine.updateMany({
+        where: { roomId: { in: roomIds } },
+        data: { roomId: null, rowIndex: null, positionIndex: null }
+      });
+      await prisma.room.deleteMany({
+        where: { floorId: id }
+      });
+    }
+
     return prisma.floor.delete({
       where: { id }
     });

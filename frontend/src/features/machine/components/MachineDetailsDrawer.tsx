@@ -217,6 +217,20 @@ export function MachineDetailsDrawer() {
                     machine.currentAssignment?.workerName ?? "Unassigned"
                   }
                 />
+                <InfoField
+                  label="Assigned Time"
+                  value={
+                    machine.currentAssignment?.assignedAt 
+                      ? new Date(machine.currentAssignment.assignedAt).toLocaleString() 
+                      : "N/A"
+                  }
+                />
+                <InfoField
+                  label="Shift"
+                  value={
+                    machine.currentAssignment?.shift ?? "N/A"
+                  }
+                />
               </div>
             </section>
 

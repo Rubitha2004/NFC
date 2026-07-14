@@ -19,43 +19,43 @@ export const MACHINE_STATUS_META: Record<
 > = {
   running: {
     label: 'Running',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/50',
-    glow: 'shadow-[0_0_14px_3px_rgba(16,185,129,0.28)]',
-    dot: 'bg-emerald-400',
+    color: 'text-red-400',
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/50',
+    glow: 'shadow-[0_0_14px_3px_rgba(239,68,68,0.28)]',
+    dot: 'bg-red-500',
   },
   idle: {
     label: 'Idle',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/50',
+    glow: 'shadow-[0_0_12px_2px_rgba(16,185,129,0.22)]',
+    dot: 'bg-emerald-400',
+  },
+  offline: {
+    label: 'Offline',
     color: 'text-amber-400',
     bg: 'bg-amber-500/10',
     border: 'border-amber-500/50',
     glow: 'shadow-[0_0_12px_2px_rgba(245,158,11,0.22)]',
     dot: 'bg-amber-400',
   },
-  offline: {
-    label: 'Offline',
-    color: 'text-red-400',
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/50',
-    glow: 'shadow-[0_0_12px_2px_rgba(239,68,68,0.22)]',
-    dot: 'bg-red-500',
-  },
   maintenance: {
     label: 'Maintenance',
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10',
-    border: 'border-violet-500/50',
-    glow: 'shadow-[0_0_12px_2px_rgba(139,92,246,0.22)]',
-    dot: 'bg-violet-400',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/50',
+    glow: 'shadow-[0_0_12px_2px_rgba(245,158,11,0.22)]',
+    dot: 'bg-amber-400',
   },
   no_worker: {
     label: 'No Worker',
-    color: 'text-zinc-400',
-    bg: 'bg-zinc-500/10',
-    border: 'border-zinc-600/40',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/50',
     glow: '',
-    dot: 'bg-zinc-500',
+    dot: 'bg-emerald-400',
   },
 };
 
@@ -213,6 +213,8 @@ export interface FactoryRoom {
   description?: string;
   roomType: RoomType;
   lines: ProductionLine[];
+  machinesPerRow?: number;
+  rowsCount?: number;
   position?: { x?: number; y?: number; z?: number };
 }
 

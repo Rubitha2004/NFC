@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Building2, Plus, ArrowRight, Settings } from "lucide-react";
+import { Building2, Plus, ArrowRight, Settings, Trash2 } from "lucide-react";
 import { PageContainer, PageHeader } from "@/shared/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { floorService } from "./services/floor.service";
@@ -67,9 +67,23 @@ export default function FactoryLayoutPage() {
                   <div className="text-sm text-white/60">
                     <span className="font-medium text-white">{floor._count?.rooms || 0}</span> Rooms Configured
                   </div>
-                  <Button variant="ghost" size="sm" className="gap-2 text-primary hover:text-primary hover:bg-primary/10" onClick={() => setSelectedFloor(floor)}>
-                    Manage Rooms <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" className="gap-2 text-primary hover:text-primary hover:bg-primary/10" onClick={() => setSelectedFloor(floor)}>
+                      Manage Rooms <ArrowRight className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={async () => {
+                      if (confirm("Are you sure you want to delete this floor? All rooms inside will be removed.")) {
+                        try {
+                          await floorService.delete(floor.id);
+                          fetchFloors();
+                        } catch (err: any) {
+                          alert(err.response?.data?.message || err.message || "Failed to delete floor.");
+                        }
+                      }
+                    }}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

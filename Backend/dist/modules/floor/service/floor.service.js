@@ -43,9 +43,6 @@ class FloorService {
         if (!existing) {
             throw new Error("Floor not found.");
         }
-        if (existing.rooms.length > 0) {
-            throw new Error("Cannot delete floor with rooms.");
-        }
         return await this.repository.delete(id);
     }
 }

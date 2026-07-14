@@ -53,10 +53,17 @@ class IotService {
                 const task = await tx.productionTask.findFirst({
                     where: { productionOrderId: tag.bundle.productionOrderId, operationId: operation.id }
                 });
-                // If it's the final operation, we might mark the task as COMPLETED (or let QC do it).
-                // Following the prompt's suggestion: scan-out on final operation -> COMPLETED
-                if (isFinalOperation && task && task.status !== "COMPLETED") {
-                    await tx.productionTask.update({ where: { id: task.id }, data: { status: "COMPLETED" } });
+                // Increment ProductionTask quantity and check for completion
+                if (task) {
+                    const newCompletedQty = (task.completedQuantity || 0) + tag.bundle.quantity;
+                    const newStatus = newCompletedQty >= task.targetQuantity ? "COMPLETED" : "RUNNING";
+                    await tx.productionTask.update({
+                        where: { id: task.id },
+                        data: {
+                            completedQuantity: newCompletedQty,
+                            status: newStatus
+                        }
+                    });
                 }
                 websocket_1.websocketService.publish(websocket_1.WEBSOCKET_EVENTS.BUNDLE_UPDATED, updatedBundle);
                 return { action: "SCAN_OUT", bundle: tag.bundle.bundleNumber, operation: operation.operationName, movedToQC: isFinalOperation };

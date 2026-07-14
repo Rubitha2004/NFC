@@ -1,6 +1,7 @@
 import { RoomRepository } from "../repository/room.repository";
 import { CreateRoomDTO, UpdateRoomDTO } from "../validation/room.validation";
 import { Prisma } from "@prisma/client";
+import prisma from "../../../config/prisma";
 
 export class RoomService {
   private repository: RoomRepository;
@@ -14,7 +15,7 @@ export class RoomService {
     if (existing) {
       throw new Error("Room name already exists on this floor.");
     }
-    return await this.repository.create({
+    const room = await this.repository.create({
       name: data.name,
       floor: { connect: { id: data.floorId } },
       roomType: data.roomType,
@@ -22,6 +23,8 @@ export class RoomService {
       machinesPerRow: data.machinesPerRow,
       status: data.status,
     });
+    await this.autoAllocateMachines(room.id, room.rowsCount, room.machinesPerRow);
+    return room;
   }
 
   async getById(id: number) {
@@ -58,16 +61,66 @@ export class RoomService {
       updateData.floor = { connect: { id: data.floorId } };
     }
 
-    return await this.repository.update(id, updateData);
+    const room = await this.repository.update(id, updateData);
+    await this.autoAllocateMachines(room.id, room.rowsCount, room.machinesPerRow);
+    return room;
+  }
+
+  private async autoAllocateMachines(roomId: number, rowsCount: number, machinesPerRow: number) {
+    const totalSlots = rowsCount * machinesPerRow;
+
+    // 1. Get machines currently in this room
+    let roomMachines = await prisma.machine.findMany({
+      where: { roomId },
+      orderBy: { id: 'asc' }
+    });
+
+    // 2. If we need more machines, pull from unassigned
+    if (roomMachines.length < totalSlots) {
+      const needed = totalSlots - roomMachines.length;
+      const unassigned = await prisma.machine.findMany({
+        where: { roomId: null },
+        take: needed,
+        orderBy: { id: 'asc' }
+      });
+      
+      if (unassigned.length > 0) {
+        await prisma.machine.updateMany({
+          where: { id: { in: unassigned.map(m => m.id) } },
+          data: { roomId }
+        });
+        roomMachines = [...roomMachines, ...unassigned];
+      }
+    }
+
+    // 3. Clear existing positions first to avoid unique constraint violations
+    await prisma.machine.updateMany({
+      where: { roomId },
+      data: { rowIndex: null, positionIndex: null }
+    });
+
+    // 4. Update rowIndex and positionIndex sequentially
+    let machineIndex = 0;
+    for (let r = 0; r < rowsCount; r++) {
+      for (let p = 0; p < machinesPerRow; p++) {
+        if (machineIndex < roomMachines.length) {
+          const m = roomMachines[machineIndex];
+          await prisma.machine.update({
+             where: { id: m.id },
+             data: { rowIndex: r, positionIndex: p }
+          });
+          machineIndex++;
+        } else {
+          break;
+        }
+      }
+    }
   }
 
   async delete(id: number) {
     const existing = await this.repository.findById(id);
     if (!existing) {
       throw new Error("Room not found.");
-    }
-    if (existing.machines && existing.machines.length > 0) {
-      throw new Error("Cannot delete room with assigned machines.");
     }
     return await this.repository.delete(id);
   }

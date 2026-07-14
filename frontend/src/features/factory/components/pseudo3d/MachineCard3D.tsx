@@ -10,19 +10,19 @@ import { useFactoryStore } from '../../store/factory.store';
 // ─── Status → raw RGB for inline shadow/glow ─────────────────────────────────
 
 const STATUS_RGB: Record<MachineStatus, string> = {
-  running:     '16, 185, 129',
-  idle:        '245, 158, 11',
-  offline:     '239, 68, 68',
-  maintenance: '139, 92, 246',
-  no_worker:   '113, 113, 122',
+  running:     '239, 68, 68',
+  idle:        '16, 185, 129',
+  offline:     '245, 158, 11',
+  maintenance: '245, 158, 11',
+  no_worker:   '16, 185, 129',
 };
 
 const STATUS_DEPTH_BG: Record<MachineStatus, string> = {
-  running:     'rgba(16, 185, 129, 0.45)',
-  idle:        'rgba(245, 158, 11, 0.35)',
-  offline:     'rgba(239, 68, 68, 0.35)',
-  maintenance: 'rgba(139, 92, 246, 0.35)',
-  no_worker:   'rgba(63, 63, 70, 0.30)',
+  running:     'rgba(239, 68, 68, 0.45)',
+  idle:        'rgba(16, 185, 129, 0.35)',
+  offline:     'rgba(245, 158, 11, 0.35)',
+  maintenance: 'rgba(245, 158, 11, 0.35)',
+  no_worker:   'rgba(16, 185, 129, 0.30)',
 };
 
 interface MachineCard3DProps {

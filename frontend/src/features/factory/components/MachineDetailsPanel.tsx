@@ -123,7 +123,12 @@ function InspectorContent({
                 </div>
                 <p className="text-xs text-white/40 mt-0.5">{machine.worker.role}</p>
                 <p className="text-xs text-white/30">{machine.worker.employeeId} · {machine.worker.department}</p>
-
+                <div className="flex gap-2 mt-1">
+                  <span className="text-xs text-white/50 bg-white/5 px-2 py-0.5 rounded">Shift {machine.worker.shiftId}</span>
+                  {machine.assignment && (
+                    <span className="text-xs text-white/50 bg-white/5 px-2 py-0.5 rounded">Allocated: {new Date(machine.assignment.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  )}
+                </div>
                 {/* Attendance */}
                 <div className="flex items-center gap-1.5 mt-2">
                   <span className={cn('w-1.5 h-1.5 rounded-full', ATTENDANCE_META[machine.worker.attendanceToday].dot)} />

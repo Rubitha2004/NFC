@@ -3,6 +3,7 @@ import { CreateMachineDto, UpdateMachineDto } from "../dto/machine.dto";
 import { RecordStatus } from "@prisma/client";
 import { MachineSearchParams } from "../types/machine.types";
 import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
+import prisma from "../../../config/prisma";
 
 export class MachineService {
   private repository = new MachineRepository();
@@ -129,12 +130,17 @@ export class MachineService {
     }
     const updatedMachine = await this.repository.changeStatus(id, status);
     
-    // Logic Fix: Auto-release active assignments if machine is deactivated
+    // Logic Fix: Auto-release active assignments and clear layout if machine is deactivated
     if (status === 'INACTIVE') {
-      const prisma = require("../../../config/prisma").default;
       await prisma.assignment.updateMany({
         where: { machineId: id, status: 'ACTIVE' },
         data: { status: 'COMPLETED', releasedAt: new Date() }
+      });
+      
+      // Free up the physical slot on the factory floor
+      await prisma.machine.update({
+        where: { id },
+        data: { roomId: null, rowIndex: null, positionIndex: null }
       });
     }
 

@@ -5,7 +5,6 @@ import { roomService } from "../services/room.service";
 import { Button } from "@/components/ui/button";
 import { AddRoomDialog } from "./AddRoomDialog";
 import { EditRoomDialog } from "./EditRoomDialog";
-import { AssignMachineToRoomModal } from "./AssignMachineToRoomModal";
 
 interface Props {
   floor: Floor;
@@ -18,7 +17,6 @@ export function FloorDetailsDrawer({ floor, onClose, onUpdate }: Props) {
   const [loading, setLoading] = useState(true);
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
-  const [assignRoomToMachine, setAssignRoomToMachine] = useState<Room | null>(null);
 
   const fetchRooms = async () => {
     try {
@@ -122,15 +120,6 @@ export function FloorDetailsDrawer({ floor, onClose, onUpdate }: Props) {
           room={editingRoom}
           onClose={() => setEditingRoom(null)}
           onSuccess={() => { fetchRooms(); onUpdate(); }}
-        />
-      )}
-
-      {assignRoomToMachine && (
-        <AssignMachineToRoomModal
-          isOpen={true}
-          room={assignRoomToMachine}
-          onClose={() => setAssignRoomToMachine(null)}
-          onSuccess={fetchRooms}
         />
       )}
     </>

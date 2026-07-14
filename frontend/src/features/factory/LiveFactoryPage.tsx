@@ -114,6 +114,22 @@ export default function LiveFactoryPage() {
           </div>
         )}
 
+        {/* Legend */}
+        <div className="flex items-center gap-6 mb-6 px-4 py-3 bg-white/5 border border-white/10 rounded-xl w-max shadow-inner">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500 border border-red-400" />
+            <span className="text-sm font-medium text-white/80">Occupied / Assigned</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-400" />
+            <span className="text-sm font-medium text-white/80">Available / Idle</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-amber-500 border border-amber-400" />
+            <span className="text-sm font-medium text-white/80">Maintenance / Offline</span>
+          </div>
+        </div>
+
         {!selectedFloorId ? (
           <FloorSelection floors={filteredFloors} onSelect={setSelectedFloorId} />
         ) : !selectedRoomId ? (
@@ -284,24 +300,22 @@ function RoomSelection({ rooms, onSelect }: { rooms: FactoryRoom[], onSelect: (i
 // ─── Room Layout (Machines Grid) ─────────────────────────────────────────────
 
 const ROW_PREFIXES = ['A', 'B', 'C', 'D'];
-const MACHINES_PER_ROW = 35;
-const NUM_ROWS = 4;
-
 function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
   
-  // We will force render 4 rows, A, B, C, D.
-  const rows = Array.from({ length: NUM_ROWS }, (_, i) => {
+  const numRows = room.rowsCount || 4;
+  const machinesPerRow = room.machinesPerRow || 35;
+
+  const rows = Array.from({ length: numRows }, (_, i) => {
     const prefix = ROW_PREFIXES[i] || `R${i+1}`;
     const lineName = `Line ${prefix}`;
-    // The API maps lines by index, so line[0] is Line A.
-    const roomLine = room.lines[i]; 
+    const roomLine = room.lines.find(l => l.lineNumber === i + 1); 
     const rowMachines = roomLine?.machines || [];
 
     return (
       <div key={i} className="mb-16 last:mb-0">
         <div className="flex items-center gap-3 mb-6">
-          <div className="text-sm font-medium text-white/40 bg-white/5 px-3 py-1 rounded-full">
-            {rowMachines.length} / {MACHINES_PER_ROW} Machines Active
+          <div className="text-sm font-medium text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/10 shadow-sm">
+            {rowMachines.length} / {machinesPerRow} Machines Active
           </div>
         </div>
         
@@ -320,17 +334,17 @@ function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
            </div>
            
            {/* Slots */}
-           <div className="relative z-10 w-full min-w-max flex flex-col gap-12">
-             <div className="flex gap-2">
-               {Array.from({ length: Math.ceil(MACHINES_PER_ROW / 2) }, (_, slotIdx) => {
-                  const absoluteIndex = slotIdx * 2; // 0, 2, 4 -> A1, A3, A5
+           <div className="relative z-10 w-full min-w-max flex flex-col gap-12 pt-2 pb-2">
+             <div className="flex gap-4">
+               {Array.from({ length: Math.ceil(machinesPerRow / 2) }, (_, slotIdx) => {
+                  const absoluteIndex = slotIdx * 2; 
                   const machine = rowMachines.find(m => m.position?.index === absoluteIndex);
                   return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} />;
                })}
              </div>
-             <div className="flex gap-2 pl-6">
-               {Array.from({ length: Math.floor(MACHINES_PER_ROW / 2) }, (_, slotIdx) => {
-                  const absoluteIndex = slotIdx * 2 + 1; // 1, 3, 5 -> A2, A4, A6
+             <div className="flex gap-4 pl-10">
+               {Array.from({ length: Math.floor(machinesPerRow / 2) }, (_, slotIdx) => {
+                  const absoluteIndex = slotIdx * 2 + 1; 
                   const machine = rowMachines.find(m => m.position?.index === absoluteIndex);
                   return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} />;
                })}
@@ -358,23 +372,52 @@ function MachineNode({ label, number, machine, search }: { label: string, number
   if (!machine) {
     return (
       <div className="w-16 h-16 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col justify-center items-center shrink-0 shadow-inner" title="Not Assigned to Floor">
-        <span className="text-xl font-bold text-white/10 mb-0.5">{number}</span>
-        <span className="text-[8px] font-bold text-white/20">{label}</span>
+        <span className="text-xl font-bold text-white/10 mb-0.5">{label}</span>
       </div>
     );
   }
 
-  const isRunning = machine.status === 'running';
-  const isIdle = machine.status === 'idle' || machine.status === 'no_worker';
+  // Determine States
   const isOffline = machine.status === 'offline' || machine.status === 'maintenance';
+  const hasWorker = !!machine.worker;
   
-  const statusColor = isRunning ? 'border-emerald-600 bg-emerald-500/10' : 
-                      isIdle ? 'border-amber-500 bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.1)]' : 
-                      'border-red-600/50 bg-red-500/10';
+  // Dummy Simulation for Presentation based on Machine ID
+  const machineIdNum = parseInt(machine.id.replace(/\D/g, '') || '0');
+  const dummyState = machineIdNum % 3;
+  
+  const isWorking = hasWorker && dummyState === 0;
+  const isAssignedNotWorking = hasWorker && dummyState === 1;
+  const isSittingNoBundle = hasWorker && dummyState === 2;
 
-  const dotColor = isRunning ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : isIdle ? 'bg-amber-400' : 'bg-red-500';
-  
-  const statusText = isRunning ? 'Assigned' : isIdle ? 'Idle' : 'Not in Use';
+  let statusColor = 'border-white/10 bg-white/[0.02]';
+  let dotColor = 'bg-white/20';
+  let textColor = 'text-white/30';
+  let statusText = 'Not in Use';
+
+  if (isOffline) {
+    statusColor = 'border-red-600 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.2)]';
+    dotColor = 'bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.8)]';
+    textColor = 'text-red-400';
+    statusText = 'Machine Problem';
+  } else if (isWorking) {
+    statusColor = 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.2)]';
+    dotColor = 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]';
+    textColor = 'text-emerald-400';
+    statusText = 'Working';
+  } else if (isSittingNoBundle) {
+    statusColor = 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.2)]';
+    dotColor = 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.8)]';
+    textColor = 'text-blue-400';
+    statusText = 'Sitting (No Bundle)';
+  } else if (isAssignedNotWorking) {
+    statusColor = 'border-amber-500 bg-amber-500/10 shadow-[0_0_15px_rgba(245,158,11,0.2)]';
+    dotColor = 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]';
+    textColor = 'text-amber-400';
+    statusText = 'Assigned (Not Started)';
+  } else {
+    // Blank/Unassigned state
+    statusText = 'Blank / Unassigned';
+  }
 
   return (
     <motion.div 
@@ -386,14 +429,16 @@ function MachineNode({ label, number, machine, search }: { label: string, number
         }
       }}
       className={cn(
-        "w-16 h-16 rounded-xl border-x border-t border-b-4 flex flex-col items-center justify-center shrink-0 relative group cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.3)]",
+        "w-16 h-16 rounded-xl border-x border-t border-b-4 flex flex-col items-center justify-center shrink-0 relative group cursor-pointer shadow-[0_4px_10px_rgba(0,0,0,0.3)] transition-colors",
         statusColor,
         isMatch ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-950 scale-110 z-10" : "",
-        isMatch && isRunning ? "shadow-[0_0_20px_rgba(16,185,129,0.5)]" : ""
+        isMatch && isWorking ? "shadow-[0_0_20px_rgba(16,185,129,0.5)]" : ""
       )}
-      title={`${machine.machineNumber} - ${machine.worker?.name || 'Not Assigned'}`}
+      title={`${label} - ${machine.worker?.name || 'Not Assigned'}`}
     >
-      <div className={cn("absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 transition-all duration-300", dotColor)} />
+      {hasWorker && !isOffline && (
+        <div className={cn("absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 transition-all duration-300", dotColor)} />
+      )}
       
       {isOffline && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
@@ -401,20 +446,16 @@ function MachineNode({ label, number, machine, search }: { label: string, number
         </div>
       )}
 
-      <span className={cn("text-xl font-black mb-0.5 tracking-tighter relative z-10", isRunning ? "text-emerald-400" : isOffline ? "text-red-400" : "text-amber-500")}>
-        {number}
-      </span>
-      
-      <span className="text-[9px] font-bold text-white/60 tracking-wider relative z-10">
-        {machine.machineNumber}
+      <span className={cn("text-xl font-black tracking-tighter relative z-10", textColor)}>
+        {label}
       </span>
       
       {/* Tooltip on hover */}
       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-zinc-900/95 backdrop-blur-md border border-white/10 rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-max z-30 shadow-2xl">
-        <div className="text-sm font-bold text-white mb-1">{machine.machineNumber}</div>
+        <div className="text-sm font-bold text-white mb-1">{label}</div>
         <div className="flex items-center gap-2 mb-1.5">
             <div className={cn("w-2 h-2 rounded-full", dotColor)} />
-            <span className={cn("text-xs font-semibold", isRunning ? "text-emerald-400" : isIdle ? "text-amber-400" : "text-red-400")}>{statusText}</span>
+            <span className={cn("text-xs font-semibold", textColor)}>{statusText}</span>
         </div>
         <div className="text-xs text-white/70 flex items-center gap-1.5">
           <User className="w-3.5 h-3.5" /> {machine.worker?.name || 'No Worker Assigned'}

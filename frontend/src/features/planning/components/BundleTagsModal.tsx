@@ -35,8 +35,8 @@ export function BundleTagsModal({ isOpen, onClose, orderNumber, bundles }: Bundl
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-white tracking-tight">Order Planned & Tags Generated!</h2>
-                <p className="text-emerald-400/80 mt-1">Successfully published to IoT terminals. {bundles.length} bundles generated for {orderNumber}.</p>
+                <h2 className="text-2xl font-bold text-white tracking-tight">Order Planned. Assign Physical Tags</h2>
+                <p className="text-emerald-400/80 mt-1">Successfully published. {bundles.length} bundles generated for {orderNumber}.</p>
               </div>
             </div>
             <button
@@ -51,16 +51,12 @@ export function BundleTagsModal({ isOpen, onClose, orderNumber, bundles }: Bundl
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-white/90 flex items-center gap-2">
                 <Tags className="w-5 h-5 text-blue-400" />
-                NFC Bundle Tags Preview
+                Assign Physical NFC Tags to Bundles
               </h3>
               <div className="flex items-center gap-3">
-                <Button className="bg-zinc-800 hover:bg-zinc-700 text-white gap-2 border border-white/10">
-                  <Printer className="w-4 h-4" />
-                  Print Labels
-                </Button>
-                <Button className="bg-blue-600 hover:bg-blue-500 text-white font-bold gap-2 shadow-lg shadow-blue-500/20">
-                  <Nfc className="w-4 h-4" />
-                  Encode NFC Tags
+                <Button onClick={onClose} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold gap-2 shadow-lg shadow-emerald-500/20">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Done Assigning
                 </Button>
               </div>
             </div>
@@ -88,17 +84,24 @@ export function BundleTagsModal({ isOpen, onClose, orderNumber, bundles }: Bundl
                         </div>
                       </div>
                       
-                      <div className="flex justify-between items-end border-t border-dashed border-zinc-300 pt-3">
-                        <div>
-                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Quantity</div>
-                          <div className="text-2xl font-bold">{bundle.quantity} <span className="text-sm font-medium text-zinc-500">pcs</span></div>
+                      <div className="flex flex-col gap-3 border-t border-dashed border-zinc-300 pt-3">
+                        <div className="flex justify-between items-end">
+                          <div>
+                            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Quantity</div>
+                            <div className="text-2xl font-bold">{bundle.quantity} <span className="text-sm font-medium text-zinc-500">pcs</span></div>
+                          </div>
                         </div>
                         
-                        {/* Simulated Barcode */}
-                        <div className="flex gap-[2px] h-8 opacity-80">
-                          {[...Array(16)].map((_, i) => (
-                            <div key={i} className={`h-full bg-zinc-900 ${Math.random() > 0.5 ? 'w-1' : 'w-0.5'}`} />
-                          ))}
+                        {/* Physical Tag Assignment Input */}
+                        <div className="flex gap-2 items-center w-full mt-1">
+                          <input 
+                            type="text" 
+                            placeholder="Scan Tag ID..." 
+                            className="flex-1 bg-zinc-100 border border-zinc-300 rounded text-sm px-3 py-1.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-zinc-900 font-mono"
+                          />
+                          <Button size="sm" className="bg-zinc-900 hover:bg-zinc-800 text-white h-[34px] px-3">
+                            Link
+                          </Button>
                         </div>
                       </div>
                     </div>

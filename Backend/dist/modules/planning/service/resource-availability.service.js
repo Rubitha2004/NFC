@@ -33,6 +33,7 @@ class ResourceAvailabilityService {
             include: {
                 machineType: true,
                 department: true,
+                room: true,
                 assignments: { where: { status: "ACTIVE" } }
             },
         });

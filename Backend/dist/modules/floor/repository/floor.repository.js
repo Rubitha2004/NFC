@@ -47,6 +47,17 @@ class FloorRepository {
         });
     }
     async delete(id) {
+        const rooms = await prisma_1.default.room.findMany({ where: { floorId: id } });
+        const roomIds = rooms.map(r => r.id);
+        if (roomIds.length > 0) {
+            await prisma_1.default.machine.updateMany({
+                where: { roomId: { in: roomIds } },
+                data: { roomId: null, rowIndex: null, positionIndex: null }
+            });
+            await prisma_1.default.room.deleteMany({
+                where: { floorId: id }
+            });
+        }
         return prisma_1.default.floor.delete({
             where: { id }
         });

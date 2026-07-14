@@ -16,8 +16,8 @@ export const ProductionLine = memo(function ProductionLine({
 }: ProductionLineProps) {
   const { statusFilter } = useFactoryStore();
   
-  // Assume a default capacity of 35 machines per line if not specified
-  const capacity = 35;
+  // Use the actual number of machines assigned to the line
+  const capacity = line.machines.length || 0;
   const topCapacity = Math.ceil(capacity / 2);
   const bottomCapacity = Math.floor(capacity / 2);
 

@@ -52,6 +52,10 @@ export class RoomRepository {
   }
 
   async delete(id: number) {
+    await prisma.machine.updateMany({
+      where: { roomId: id },
+      data: { roomId: null, rowIndex: null, positionIndex: null }
+    });
     return prisma.room.delete({
       where: { id }
     });

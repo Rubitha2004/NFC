@@ -353,6 +353,7 @@ model ProductionTask {
   priority          Int        @default(0)
   estimatedTime     Int // In minutes
   targetQuantity    Int
+  completedQuantity Int        @default(0)
   status            TaskStatus @default(CREATED)
   supervisor        String?
   scheduledStart    DateTime?

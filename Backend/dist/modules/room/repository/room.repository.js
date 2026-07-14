@@ -51,6 +51,10 @@ class RoomRepository {
         });
     }
     async delete(id) {
+        await prisma_1.default.machine.updateMany({
+            where: { roomId: id },
+            data: { roomId: null, rowIndex: null, positionIndex: null }
+        });
         return prisma_1.default.room.delete({
             where: { id }
         });

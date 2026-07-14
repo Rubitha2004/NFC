@@ -25,7 +25,7 @@ export default function PlanningCenterPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [bundlesCount, setBundlesCount] = useState<number>(1);
   const [selectedOperations, setSelectedOperations] = useState<Set<number>>(new Set());
-  const [assignments, setAssignments] = useState<Record<number, { workerIds: number[], machineIds: number[] }>>({});
+  const [assignments, setAssignments] = useState<Record<number, { machineId: number, workerId: number }[]>>({});
   
   // Drawer state
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
@@ -60,38 +60,12 @@ export default function PlanningCenterPage() {
     });
   };
 
-  const handleToggleWorker = (opId: number, workerId: number) => {
-    setAssignments(prev => {
-      const current = prev[opId] || { workerIds: [], machineIds: [] };
-      const exists = current.workerIds.includes(workerId);
-      return {
-        ...prev,
-        [opId]: {
-          ...current,
-          workerIds: exists ? current.workerIds.filter(id => id !== workerId) : [...current.workerIds, workerId]
-        }
-      };
-    });
-  };
 
-  const handleToggleMachine = (opId: number, machineId: number) => {
-    setAssignments(prev => {
-      const current = prev[opId] || { workerIds: [], machineIds: [] };
-      const exists = current.machineIds.includes(machineId);
-      return {
-        ...prev,
-        [opId]: {
-          ...current,
-          machineIds: exists ? current.machineIds.filter(id => id !== machineId) : [...current.machineIds, machineId]
-        }
-      };
-    });
-  };
 
   const handleAutoPlan = () => {
     if (!selectedOrder || !resources) return;
     
-    const newAssignments: Record<number, { workerIds: number[], machineIds: number[] }> = {};
+    const newAssignments: Record<number, { machineId: number, workerId: number }[]> = {};
     
     // Sort workers by grade priority (highest first) and try to stick to primary department
     const sortedWorkers = [...resources.workers].sort((a, b) => (b.grade?.priority || 0) - (a.grade?.priority || 0));
@@ -106,8 +80,8 @@ export default function PlanningCenterPage() {
       const requiredMinutes = Math.ceil(selectedOrder.targetQuantity * (op as any).smv);
       const requiredWorkers = Math.ceil(requiredMinutes / 480); // Assuming 8 hr shift
       
-      const wIds: number[] = [];
-      const mIds: number[] = [];
+      const pairs: { machineId: number, workerId: number }[] = [];
+      const usedWorkerIds = new Set<number>();
       
       // Filter available workers by required skill if applicable
       const reqSkillId = (op as any).requiredSkillId;
@@ -117,13 +91,24 @@ export default function PlanningCenterPage() {
 
       for(let i=0; i<requiredWorkers; i++) {
         // We find the next available qualified worker
-        const nextWorker = qualifiedWorkers.find(w => !wIds.includes(w.id));
-        if(nextWorker) wIds.push(nextWorker.id);
+        const nextWorker = qualifiedWorkers.find(w => !usedWorkerIds.has(w.id));
+        let wId = null;
+        if(nextWorker) {
+          usedWorkerIds.add(nextWorker.id);
+          wId = nextWorker.id;
+        }
         
-        if(machineIndex < availableMachines.length) mIds.push(availableMachines[machineIndex++].id);
+        let mId = null;
+        if(machineIndex < availableMachines.length) {
+          mId = availableMachines[machineIndex++].id;
+        }
+
+        if (wId !== null && mId !== null) {
+          pairs.push({ workerId: wId, machineId: mId });
+        }
       }
       
-      if (op.id) newAssignments[Number(op.id)] = { workerIds: wIds, machineIds: mIds };
+      if (op.id) newAssignments[Number(op.id)] = pairs;
     });
 
     setAssignments(newAssignments);
@@ -145,12 +130,16 @@ export default function PlanningCenterPage() {
     const assignmentArray: any[] = [];
     Object.entries(assignments).forEach(([opIdStr, alloc]) => {
       const opId = Number(opIdStr);
-      const count = Math.min(alloc?.workerIds?.length || 0, alloc?.machineIds?.length || 0);
-      for(let i = 0; i < count; i++) {
-        assignmentArray.push({
-          operationId: opId,
-          workerId: alloc.workerIds[i],
-          machineId: alloc.machineIds[i]
+      if (alloc && Array.isArray(alloc)) {
+        alloc.forEach((pair: any) => {
+          assignmentArray.push({
+            operationId: opId,
+            workerId: pair.workerId,
+            machineId: pair.machineId,
+            roomId: pair.roomId,
+            rowIndex: pair.rowIndex,
+            positionIndex: pair.positionIndex
+          });
         });
       }
     });
@@ -283,16 +272,12 @@ export default function PlanningCenterPage() {
         operationName={(activeOp as any)?.name || ""}
         availableWorkers={resources?.workers || []}
         availableMachines={resources?.machines || []}
-        initialSelectedWorkerIds={activeOperationId ? (assignments[activeOperationId]?.workerIds || []) : []}
-        initialSelectedMachineIds={activeOperationId ? (assignments[activeOperationId]?.machineIds || []) : []}
-        onSave={(machineIds, workerIds) => {
+        initialAllocations={activeOperationId ? (assignments[activeOperationId] || []) : []}
+        onSave={(allocations) => {
           if (activeOperationId) {
             setAssignments(prev => ({
               ...prev,
-              [activeOperationId]: {
-                workerIds,
-                machineIds
-              }
+              [activeOperationId]: allocations
             }));
             setActiveOperationId(null);
           }
@@ -382,8 +367,8 @@ export default function PlanningCenterPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {operations.map(op => {
                     const isSelected = selectedOperations.has(Number(op.id));
-                    const alloc = assignments[Number(op.id)] || { workerIds: [], machineIds: [] };
-                    const isMismatched = (alloc?.workerIds?.length || 0) !== (alloc?.machineIds?.length || 0);
+                    const alloc = assignments[Number(op.id)] || [];
+                    const isMismatched = false; // With explicit pairing, mismatch is impossible
 
                     return (
                       <div 
@@ -431,14 +416,14 @@ export default function PlanningCenterPage() {
                           <div className="flex items-center justify-between border-t border-emerald-500/20 pt-2 mt-1">
                             <div className="flex items-center gap-3 text-xs">
                               <div className="flex items-center gap-1 text-emerald-400/80">
-                                <Users className="w-3 h-3" /> {alloc.workerIds.length}
+                                <Users className="w-3 h-3" /> {alloc.length}
                               </div>
                               <div className="flex items-center gap-1 text-blue-400/80">
-                                <Cpu className="w-3 h-3" /> {alloc.machineIds.length}
+                                <Cpu className="w-3 h-3" /> {alloc.length}
                               </div>
                             </div>
                             {isMismatched && (
-                              <ShieldAlert className="w-4 h-4 text-amber-500" title="Workers/Machines mismatch" />
+                              <ShieldAlert className="w-4 h-4 text-amber-500" />
                             )}
                           </div>
                         )}

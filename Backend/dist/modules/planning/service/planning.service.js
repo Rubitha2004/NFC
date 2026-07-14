@@ -245,6 +245,16 @@ class PlanningService {
                     where: { workerId: a.workerId, status: 'ACTIVE' },
                     data: { status: 'COMPLETED', releasedAt: new Date() }
                 });
+                if (a.roomId !== undefined && a.rowIndex !== undefined && a.positionIndex !== undefined) {
+                    await tx.machine.update({
+                        where: { id: a.machineId },
+                        data: {
+                            roomId: a.roomId,
+                            rowIndex: a.rowIndex,
+                            positionIndex: a.positionIndex
+                        }
+                    });
+                }
                 const assignment = await tx.assignment.create({
                     data: {
                         operationId: a.operationId,
