@@ -12,7 +12,19 @@ const server = http.createServer(app);
 
 // Initialize WebSocket Service
 websocketService.init(server);
+app.get("/", (req, res) => {
+  res.json({
+    status: "OK",
+    message: "NFC ERP Backend is running",
+  });
+});
 
+app.get("/health", (req, res) => {
+  res.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+  });
+});
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
