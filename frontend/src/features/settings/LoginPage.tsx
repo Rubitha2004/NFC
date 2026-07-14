@@ -18,7 +18,7 @@ export default function LoginPage() {
     await new Promise((r) => setTimeout(r, 800));
     login({ id: 1, name: "Admin User", email: "admin@factory.com", role: "admin" }, "demo-token");
     setIsLoading(false);
-    navigate("/dashboard");
+    navigate("/planning/center");
   };
 
   return (

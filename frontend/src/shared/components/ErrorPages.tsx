@@ -38,7 +38,7 @@ function ErrorPage({ code, title, description }: ErrorPageProps) {
           <Button variant="outline" onClick={() => navigate(-1)} className="gap-2">
             <RefreshCw className="w-4 h-4" /> Go Back
           </Button>
-          <Button onClick={() => navigate("/dashboard")} className="gap-2">
+          <Button onClick={() => navigate("/planning/center")} className="gap-2">
             <Home className="w-4 h-4" /> Dashboard
           </Button>
         </div>
