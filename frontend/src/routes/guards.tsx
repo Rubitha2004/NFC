@@ -10,5 +10,9 @@ export function ProtectedRoute() {
 // Redirects to dashboard if already authenticated
 export function GuestRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />;
+  return isAuthenticated ? (
+    <Navigate to="/planning/center" replace />
+  ) : (
+    <Outlet />
+  );
 }
