@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ScanLine, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import axios from "axios";
+import api from "@/services/axios";
 
 export default function IotTerminalPage() {
   const [terminalCode, setTerminalCode] = useState("TERM-001");
@@ -21,7 +21,7 @@ export default function IotTerminalPage() {
     setLastResult(null);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/v1/iot/scan", {
+      const res = await api.post("/iot/scan", {
         tagCode,
         workerCardId,
         terminalCode

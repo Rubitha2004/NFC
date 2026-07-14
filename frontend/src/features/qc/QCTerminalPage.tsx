@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ShieldCheck, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import axios from "axios";
+import api from "@/services/axios";
 
 export default function QCTerminalPage() {
   const [qcPersonCardId, setQcPersonCardId] = useState("");
@@ -22,7 +22,7 @@ export default function QCTerminalPage() {
     setBundleData(null);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/v1/qc-checks/scan", {
+      const res = await api.post("/qc-checks/scan", {
         tagCode,
         qcPersonCardId
       });
@@ -41,7 +41,7 @@ export default function QCTerminalPage() {
     if (!bundleData) return;
     setSubmitting(true);
     try {
-      await axios.post("http://localhost:5000/api/v1/qc-checks", {
+      await api.post("/qc-checks", {
         bundleId: bundleData.bundle.id,
         tagId: bundleData.tag.id,
         qcPersonId: bundleData.qcPerson.id,

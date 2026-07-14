@@ -3,7 +3,9 @@ export const APP_NAME = "FactoryOS";
 export const APP_DESCRIPTION = "Smart Factory ERP & Production Management System";
 export const APP_VERSION = "1.0.0";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+export const API_BASE_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL}/api/v1`
+  : "http://localhost:5000/api/v1";
 export const WS_URL = import.meta.env.VITE_WS_URL || "http://localhost:5000";
 
 export const SIDEBAR_WIDTH = 240;
