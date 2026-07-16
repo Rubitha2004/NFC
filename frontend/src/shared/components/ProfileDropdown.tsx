@@ -24,7 +24,7 @@ export function ProfileDropdown() {
       <DropdownMenuTrigger render={
         <Button variant="ghost" className="h-9 gap-2 px-2 rounded-lg">
           {/* Avatar */}
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-xs font-bold">
+          <div className="w-7 h-7 shrink-0 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center text-white text-xs font-bold">
             {user?.name?.charAt(0) ?? "A"}
           </div>
           <div className="hidden md:flex flex-col items-start leading-none">

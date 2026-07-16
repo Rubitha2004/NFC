@@ -221,9 +221,12 @@ export class PlanningService {
           throw new Error(`Not enough available tags in the pool. Need ${data.bundles.length}, but only have ${availableTags.length}. Please register more tags first.`);
         }
 
+        let currentBundleCount = await tx.bundle.count({ where: { productionOrderId: order.id } });
+
         for (let i = 0; i < data.bundles.length; i++) {
           const b = data.bundles[i];
-          const bundleNumber = await this.generateUniqueBundleNumber(tx, order.orderNumber);
+          currentBundleCount++;
+          const bundleNumber = `${order.orderNumber}-B${currentBundleCount.toString().padStart(3, '0')}`;
           const safeQuantity = Math.max(1, Math.floor(b.quantity));
           const bundle = await tx.bundle.create({
             data: {
@@ -360,7 +363,7 @@ export class PlanningService {
         bundlesCreated: newBundles.length,
         assignmentsCreated: createdAssignments.length
       };
-    }, { isolationLevel: 'Serializable' });
+    }, { timeout: 30000, isolationLevel: 'Serializable' });
   }
 
   async getHistory() {

@@ -48,8 +48,8 @@ export default function LiveFactoryPage() {
   return (
     <div className="flex flex-col h-full bg-zinc-950 text-white overflow-y-auto" style={{ height: 'calc(100vh - 56px)' }}>
       {/* Header & Breadcrumbs */}
-      <div className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-white/10 p-6 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 text-sm font-medium">
+      <div className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-white/10 p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
           <button 
             onClick={() => { setSelectedFloorId(null); setSelectedRoomId(null); }}
             className={cn("hover:text-white transition-colors", !selectedFloorId ? "text-emerald-400 font-bold" : "text-white/50")}
@@ -79,7 +79,7 @@ export default function LiveFactoryPage() {
           )}
         </div>
 
-        <div className="relative w-72">
+        <div className="relative w-full md:w-72">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
           <input 
             type="text"
@@ -92,9 +92,9 @@ export default function LiveFactoryPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="p-6 flex-1 flex flex-col">
+      <div className="p-4 md:p-6 flex-1 flex flex-col">
         {!selectedFloorId && (
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="bg-zinc-900 border border-white/10 p-4 rounded-xl">
               <div className="text-3xl font-bold text-white mb-1">{totalGlobalFloors}</div>
               <div className="text-xs text-white/50 uppercase font-semibold">Total Floors</div>

@@ -10,6 +10,7 @@ import { ProfileDropdown } from "./ProfileDropdown";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { getCurrentDate, getCurrentTime } from "@/shared/utils/date.utils";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TopNavbarProps {
   sidebarWidth: number;
@@ -17,6 +18,7 @@ interface TopNavbarProps {
 
 export function TopNavbar({ sidebarWidth }: TopNavbarProps) {
   const { toggleMobile } = useSidebarStore();
+  const isMobile = useIsMobile();
   const [time, setTime] = useState(getCurrentTime());
   const date = getCurrentDate();
 
@@ -28,7 +30,7 @@ export function TopNavbar({ sidebarWidth }: TopNavbarProps) {
 
   return (
     <motion.header
-      animate={{ paddingLeft: sidebarWidth }}
+      animate={{ paddingLeft: isMobile ? 0 : sidebarWidth }}
       transition={{ type: "spring", damping: 28, stiffness: 300 }}
       className="fixed top-0 right-0 left-0 z-20 h-14 bg-background/80 backdrop-blur-md border-b flex items-center pr-4"
     >
@@ -49,7 +51,7 @@ export function TopNavbar({ sidebarWidth }: TopNavbarProps) {
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           {/* Search */}
           <SearchBar className="hidden md:flex w-52 xl:w-72" />
 

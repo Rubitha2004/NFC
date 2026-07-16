@@ -5,6 +5,7 @@ import { TopNavbar } from "@/shared/components/TopNavbar";
 import { NotificationPanel } from "@/shared/components/NotificationPanel";
 import { useSidebarStore } from "@/store/sidebar.store";
 import { SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, NAVBAR_HEIGHT } from "@/shared/utils/constants";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Page transitions
 const pageVariants = {
@@ -15,7 +16,9 @@ const pageVariants = {
 
 export function DashboardLayout() {
   const { isCollapsed } = useSidebarStore();
+  const isMobile = useIsMobile();
   const sidebarWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+  const contentPadding = isMobile ? 0 : sidebarWidth;
 
   return (
     <div className="min-h-screen bg-background">
@@ -33,7 +36,7 @@ export function DashboardLayout() {
 
       {/* Main content area */}
       <motion.div
-        animate={{ paddingLeft: sidebarWidth }}
+        animate={{ paddingLeft: contentPadding }}
         transition={{ type: "spring", damping: 28, stiffness: 300 }}
         className="flex flex-col min-h-screen"
         style={{ paddingTop: NAVBAR_HEIGHT }}

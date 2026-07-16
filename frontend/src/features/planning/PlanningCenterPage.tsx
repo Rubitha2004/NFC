@@ -23,7 +23,7 @@ export default function PlanningCenterPage() {
   const { data: historyData = [], isLoading: loadingHistory } = usePlanningHistory();
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [bundlesCount, setBundlesCount] = useState<number>(1);
+  const [piecesPerBundle, setPiecesPerBundle] = useState<number>(12);
   const [selectedOperations, setSelectedOperations] = useState<Set<number>>(new Set());
   const [assignments, setAssignments] = useState<Record<number, { machineId: number, workerId: number }[]>>({});
   
@@ -46,7 +46,7 @@ export default function PlanningCenterPage() {
   const handleSelectOrder = (id: string) => {
     setSelectedOrderId(id);
     setAssignments({});
-    setBundlesCount(1);
+    setPiecesPerBundle(12);
     setSelectedOperations(new Set());
     setActiveOperationId(null);
   };
@@ -71,8 +71,8 @@ export default function PlanningCenterPage() {
     const sortedWorkers = [...resources.workers].sort((a, b) => (b.grade?.priority || 0) - (a.grade?.priority || 0));
     const availableWorkers = sortedWorkers.filter(w => (w.assignments?.length || 0) === 0);
     const availableMachines = resources.machines.filter((m: any) => (m.assignments?.length || 0) === 0);
-
     let machineIndex = 0;
+    const usedWorkerIds = new Set<number>();
 
     const activeOps = operations.filter(op => selectedOperations.has(Number(op.id)));
 
@@ -81,7 +81,6 @@ export default function PlanningCenterPage() {
       const requiredWorkers = Math.ceil(requiredMinutes / 480); // Assuming 8 hr shift
       
       const pairs: { machineId: number, workerId: number }[] = [];
-      const usedWorkerIds = new Set<number>();
       
       // Filter available workers by required skill if applicable
       const reqSkillId = (op as any).requiredSkillId;
@@ -118,14 +117,15 @@ export default function PlanningCenterPage() {
     if (!selectedOrder) return;
 
     const bundles: { quantity: number }[] = [];
-    const qtyPerBundle = Math.floor(selectedOrder.targetQuantity / bundlesCount);
     let remainingQty = selectedOrder.targetQuantity;
 
-    for (let i = 0; i < bundlesCount; i++) {
-      const q = (i === bundlesCount - 1) ? remainingQty : qtyPerBundle;
+    while (remainingQty > 0) {
+      const q = Math.min(piecesPerBundle, remainingQty);
       bundles.push({ quantity: q });
       remainingQty -= q;
     }
+
+    const getValidNumber = (val: any) => (val !== null && val !== undefined && val !== '' && !isNaN(Number(val))) ? Number(val) : undefined;
 
     const assignmentArray: any[] = [];
     Object.entries(assignments).forEach(([opIdStr, alloc]) => {
@@ -136,9 +136,9 @@ export default function PlanningCenterPage() {
             operationId: opId,
             workerId: pair.workerId,
             machineId: pair.machineId,
-            roomId: pair.roomId,
-            rowIndex: pair.rowIndex,
-            positionIndex: pair.positionIndex
+            roomId: getValidNumber(pair.roomId),
+            rowIndex: getValidNumber(pair.rowIndex),
+            positionIndex: getValidNumber(pair.positionIndex)
           });
         });
       }
@@ -180,6 +180,24 @@ export default function PlanningCenterPage() {
 
   const activeOp = activeOperationId ? operations.find(o => Number(o.id) === activeOperationId) : null;
   const activeOpReqMinutes = activeOp && selectedOrder ? Math.ceil(selectedOrder.targetQuantity * (activeOp as any).smv) : 0;
+
+  // Filter out resources already assigned to OTHER operations in this planning session
+  const globallyAssignedWorkers = new Set<number>();
+  const globallyAssignedMachines = new Set<number>();
+
+  if (activeOperationId) {
+    Object.entries(assignments).forEach(([opIdStr, allocs]) => {
+      if (Number(opIdStr) !== activeOperationId) {
+        allocs.forEach(a => {
+          globallyAssignedWorkers.add(Number(a.workerId));
+          globallyAssignedMachines.add(Number(a.machineId));
+        });
+      }
+    });
+  }
+
+  const filteredWorkers = (resources?.workers || []).filter(w => !globallyAssignedWorkers.has(Number(w.id)));
+  const filteredMachines = (resources?.machines || []).filter(m => !globallyAssignedMachines.has(Number(m.id)));
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 text-white overflow-hidden relative">
@@ -255,7 +273,7 @@ export default function PlanningCenterPage() {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
       
       {/* Bundle Tags Modal */}
       <BundleTagsModal 
@@ -270,8 +288,8 @@ export default function PlanningCenterPage() {
         isOpen={activeOperationId !== null}
         onClose={() => setActiveOperationId(null)}
         operationName={(activeOp as any)?.name || ""}
-        availableWorkers={resources?.workers || []}
-        availableMachines={resources?.machines || []}
+        availableWorkers={filteredWorkers}
+        availableMachines={filteredMachines}
         initialAllocations={activeOperationId ? (assignments[activeOperationId] || []) : []}
         onSave={(allocations) => {
           if (activeOperationId) {
@@ -285,7 +303,7 @@ export default function PlanningCenterPage() {
       />
 
       {/* Left Sidebar: PO Queue */}
-      <div className="w-80 border-r border-white/10 bg-zinc-900/30 flex flex-col overflow-hidden flex-shrink-0">
+      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-white/10 bg-zinc-900/30 flex flex-col overflow-hidden flex-shrink-0 md:h-full h-[250px]">
         <div className="p-4 border-b border-white/10 flex-shrink-0">
           <h2 className="text-lg font-bold">Unplanned Orders</h2>
           <p className="text-xs text-white/50 mt-1">Select an order to start planning</p>
@@ -458,13 +476,13 @@ export default function PlanningCenterPage() {
                 
                 <div className="flex items-center gap-6">
                   <div className="flex-1 max-w-sm">
-                    <label className="text-sm text-white/70 block mb-2">Number of Bundles to Create</label>
+                    <label className="text-sm text-white/70 block mb-2">Pieces per Bundle (Bundle Size)</label>
                     <input 
                       type="number" 
                       min="1"
                       max={selectedOrder.targetQuantity}
-                      value={bundlesCount}
-                      onChange={(e) => setBundlesCount(parseInt(e.target.value) || 1)}
+                      value={piecesPerBundle}
+                      onChange={(e) => setPiecesPerBundle(parseInt(e.target.value) || 1)}
                       className="w-full bg-zinc-950 border border-white/10 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
                     />
                   </div>
@@ -472,12 +490,12 @@ export default function PlanningCenterPage() {
                     <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-center justify-between">
                       <div>
                         <div className="text-sm text-blue-400 font-medium mb-1">Generated Bundles</div>
-                        <div className="text-2xl font-bold">{bundlesCount}</div>
+                        <div className="text-2xl font-bold">{Math.ceil(selectedOrder.targetQuantity / piecesPerBundle)}</div>
                       </div>
                       <ArrowRight className="w-6 h-6 text-blue-500/50" />
                       <div>
                         <div className="text-sm text-blue-400 font-medium mb-1">Items per Bundle</div>
-                        <div className="text-2xl font-bold">~{Math.floor(selectedOrder.targetQuantity / bundlesCount)}</div>
+                        <div className="text-2xl font-bold">{piecesPerBundle}</div>
                       </div>
                     </div>
                   </div>

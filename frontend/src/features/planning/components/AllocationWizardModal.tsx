@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Cpu, CheckCircle, X, Layers, Box, Wrench } from "lucide-react";
+import { Users, Cpu, CheckCircle, X, Layers, Box, Wrench, Search, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PlanningMachine, PlanningWorker } from "../types/planning.types";
 import { useFactoryData } from "../../factory/hooks/useFactoryData";
@@ -11,8 +11,8 @@ interface AllocationWizardModalProps {
   operationName: string;
   availableWorkers: PlanningWorker[];
   availableMachines: PlanningMachine[];
-  initialAllocations?: { machineId: number, workerId: number, roomId?: number, rowIndex?: number, positionIndex?: number }[];
-  onSave: (allocations: { machineId: number, workerId: number, roomId: number, rowIndex: number, positionIndex: number }[]) => void;
+  initialAllocations?: { machineId: number, workerId: number, roomId?: string | number, rowIndex?: number, positionIndex?: number }[];
+  onSave: (allocations: { machineId: number, workerId: number, roomId: string | number, rowIndex: number, positionIndex: number }[]) => void;
 }
 
 export function AllocationWizardModal({
@@ -24,10 +24,10 @@ export function AllocationWizardModal({
   initialAllocations = [],
   onSave,
 }: AllocationWizardModalProps) {
-  const [allocations, setAllocations] = useState<{ machineId: number, workerId: number, roomId: number, rowIndex: number, positionIndex: number }[]>([]);
+  const [allocations, setAllocations] = useState<{ machineId: number, workerId: number, roomId: string | number, rowIndex: number, positionIndex: number }[]>([]);
   
   // Which seat is currently being assigned
-  const [activeSelectingSeat, setActiveSelectingSeat] = useState<{ roomId: number, rowIndex: number, positionIndex: number, label: string } | null>(null);
+  const [activeSelectingSeat, setActiveSelectingSeat] = useState<{ roomId: string | number, rowIndex: number, positionIndex: number, label: string } | null>(null);
   
   // The machine selected for the active seat
   const [selectedMachineForSeat, setSelectedMachineForSeat] = useState<PlanningMachine | null>(null);
@@ -38,6 +38,19 @@ export function AllocationWizardModal({
   
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+
+  const [machineSearchQuery, setMachineSearchQuery] = useState("");
+  const [selectedMachineCategory, setSelectedMachineCategory] = useState<string>("All");
+
+  const machineCategories = ["All", ...Array.from(new Set(availableMachines.map(m => m.machineType?.name).filter(Boolean)))];
+
+  const filteredMachines = availableMachines.filter(m => {
+    const searchLower = machineSearchQuery.toLowerCase();
+    const matchesSearch = m.machineName.toLowerCase().includes(searchLower) || 
+                          m.machineCode.toLowerCase().includes(searchLower);
+    const matchesCategory = selectedMachineCategory === "All" || m.machineType?.name === selectedMachineCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   // Initialize with the first floor/room
   useEffect(() => {
@@ -82,11 +95,11 @@ export function AllocationWizardModal({
     }
   }, [isOpen, initialAllocations]);
 
-  const handleSeatClick = (roomId: number, rowIndex: number, positionIndex: number, label: string) => {
-    const isAlreadyAssigned = allocations.some(a => a.roomId === roomId && a.rowIndex === rowIndex && a.positionIndex === positionIndex);
+  const handleSeatClick = (roomId: string | number, rowIndex: number, positionIndex: number, label: string) => {
+    const isAlreadyAssigned = allocations.some(a => String(a.roomId) === String(roomId) && a.rowIndex === rowIndex && a.positionIndex === positionIndex);
     if (isAlreadyAssigned) {
       // Unassign
-      setAllocations(prev => prev.filter(a => !(a.roomId === roomId && a.rowIndex === rowIndex && a.positionIndex === positionIndex)));
+      setAllocations(prev => prev.filter(a => !(String(a.roomId) === String(roomId) && a.rowIndex === rowIndex && a.positionIndex === positionIndex)));
     } else {
       // Open selection popover for this seat
       setActiveSelectingSeat({ roomId, rowIndex, positionIndex, label });
@@ -251,9 +264,10 @@ export function AllocationWizardModal({
                           <div className="flex gap-2">
                             {Array.from({ length: Math.ceil(MACHINES_PER_ROW / 2) }).map((_, slotIdx) => {
                               const absoluteIndex = slotIdx * 2;
-                              const allocation = allocations.find(a => a.roomId === Number(selectedRoom.id) && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex);
-                              const assignedMachine = allocation ? availableMachines.find(m => m.id === allocation.machineId) : undefined;
-                              const assignedWorker = allocation ? availableWorkers.find(w => w.id === allocation.workerId) : undefined;
+                              const actualRoomId = selectedRoom.id.replace('room-', '');
+                              const allocation = allocations.find(a => String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex);
+                              const assignedMachine = allocation ? availableMachines.find(m => Number(m.id) === allocation.machineId) : undefined;
+                              const assignedWorker = allocation ? availableWorkers.find(w => Number(w.id) === allocation.workerId) : undefined;
 
                               return (
                                 <MachineNode 
@@ -262,7 +276,7 @@ export function AllocationWizardModal({
                                   isSelected={!!allocation}
                                   assignedMachine={assignedMachine}
                                   assignedWorker={assignedWorker}
-                                  onClick={() => handleSeatClick(Number(selectedRoom.id), rowIdx, absoluteIndex, `${prefix}${absoluteIndex + 1}`)}
+                                  onClick={() => handleSeatClick(actualRoomId, rowIdx, absoluteIndex, `${prefix}${absoluteIndex + 1}`)}
                                 />
                               );
                             })}
@@ -271,9 +285,10 @@ export function AllocationWizardModal({
                           <div className="flex gap-2 pl-8">
                             {Array.from({ length: Math.floor(MACHINES_PER_ROW / 2) }).map((_, slotIdx) => {
                               const absoluteIndex = slotIdx * 2 + 1;
-                              const allocation = allocations.find(a => a.roomId === Number(selectedRoom.id) && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex);
-                              const assignedMachine = allocation ? availableMachines.find(m => m.id === allocation.machineId) : undefined;
-                              const assignedWorker = allocation ? availableWorkers.find(w => w.id === allocation.workerId) : undefined;
+                              const actualRoomId = selectedRoom.id.replace('room-', '');
+                              const allocation = allocations.find(a => String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex);
+                              const assignedMachine = allocation ? availableMachines.find(m => Number(m.id) === allocation.machineId) : undefined;
+                              const assignedWorker = allocation ? availableWorkers.find(w => Number(w.id) === allocation.workerId) : undefined;
 
                               return (
                                 <MachineNode 
@@ -282,7 +297,7 @@ export function AllocationWizardModal({
                                   isSelected={!!allocation}
                                   assignedMachine={assignedMachine}
                                   assignedWorker={assignedWorker}
-                                  onClick={() => handleSeatClick(Number(selectedRoom.id), rowIdx, absoluteIndex, `${prefix}${absoluteIndex + 1}`)}
+                                  onClick={() => handleSeatClick(actualRoomId, rowIdx, absoluteIndex, `${prefix}${absoluteIndex + 1}`)}
                                 />
                               );
                             })}
@@ -357,8 +372,37 @@ export function AllocationWizardModal({
               <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-black/20">
                 {!selectedMachineForSeat ? (
                   /* Machine Selection */
-                  <div className="grid grid-cols-2 gap-3">
-                    {availableMachines.map(m => {
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                        <input
+                          type="text"
+                          placeholder="Search machines by name or code..."
+                          value={machineSearchQuery}
+                          onChange={(e) => setMachineSearchQuery(e.target.value)}
+                          className="w-full bg-zinc-900 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/5 transition-colors"
+                        />
+                      </div>
+                      <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
+                        <select
+                          value={selectedMachineCategory}
+                          onChange={(e) => setSelectedMachineCategory(e.target.value)}
+                          className="bg-zinc-900 border border-white/10 rounded-xl py-2 pl-10 pr-8 text-sm text-white appearance-none cursor-pointer focus:outline-none focus:border-white/30 focus:bg-white/5 transition-colors"
+                        >
+                          {machineCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {filteredMachines.map(m => {
                       const isAllocated = allocations.some(a => a.machineId === m.id);
                       return (
                         <button
@@ -385,11 +429,12 @@ export function AllocationWizardModal({
                         </button>
                       );
                     })}
-                    {availableMachines.length === 0 && (
-                      <div className="col-span-2 text-center py-12 text-white/40 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
-                        No machines available for this operation.
-                      </div>
-                    )}
+                      {filteredMachines.length === 0 && (
+                        <div className="col-span-2 text-center py-12 text-white/40 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
+                          No machines found matching your criteria.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   /* Worker Selection */

@@ -39,10 +39,10 @@ export const PublishPlanSchema = z.object({
     operationId: z.number(),
     workerId: z.number(),
     machineId: z.number(),
-    shiftId: z.number().optional(),
-    roomId: z.number().optional(),
-    rowIndex: z.number().optional(),
-    positionIndex: z.number().optional()
+    shiftId: z.number().nullable().optional(),
+    roomId: z.number().nullable().optional(),
+    rowIndex: z.number().nullable().optional(),
+    positionIndex: z.number().nullable().optional()
   })),
   operations: z.array(z.number()).optional()
 });
