@@ -95,7 +95,10 @@ export const mapMachineAPIToUI = (data: MachineAPIResponse): MachineData => {
     currentAssignment: data.assignments && data.assignments.length > 0 ? {
       workerId: data.assignments[0].worker?.employeeCode || String(data.assignments[0].workerId),
       workerName: data.assignments[0].worker ? `${data.assignments[0].worker.firstName} ${data.assignments[0].worker.lastName}` : "Unknown Worker",
-      operation: data.assignments[0].operation?.operationName || "Unknown Operation",
+      operation: (data as any).productionTasks?.[0]?.operation?.name || data.assignments[0].operation?.operationName || "Unknown Operation",
+      project: (data as any).productionTasks?.[0]?.productionOrder?.styleName || 'N/A',
+      productionOrder: (data as any).productionTasks?.[0]?.productionOrder?.orderNumber || 'N/A',
+      department: (data as any).productionTasks?.[0]?.department?.name || data.department?.name || 'General',
       assignedAt: data.assignments[0].assignedAt,
       shift: data.assignments[0].shift?.name || "Morning"
     } : undefined,

@@ -9,6 +9,9 @@ export interface OperationAPIResponse {
   standardMinuteValue: number;
   displayOrder: number;
   status: string;
+  requiredSkillId: number | null;
+  requiredSkill?: { id: number; name: string } | null;
+  machineOperationAssignments?: { machine: { machineName: string; machineCode: string } }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -17,12 +20,13 @@ export const mapOperationAPIToUI = (data: OperationAPIResponse): Operation => ({
   id: String(data.id),
   operationCode: data.operationCode,
   name: data.operationName,
-  department: 'Sewing', // Defaulting as not present in backend
+  department: '',
   description: data.description || '',
   smv: data.standardMinuteValue,
-  requiredGrade: 'Grade A', // Defaulting
-  requiredSkill: 'Stitching', // Defaulting
-  compatibleMachines: ['Single Needle'], // Defaulting
+  requiredGrade: 'Grade A',
+  requiredSkill: data.requiredSkill?.name || '',
+  requiredSkillId: data.requiredSkillId ?? undefined,
+  compatibleMachines: data.machineOperationAssignments?.map(moa => moa.machine.machineName) ?? [],
   status: data.status === 'ACTIVE' ? 'active' : 'inactive',
   assignedWorkers: 0,
   assignedMachines: 0,
@@ -40,13 +44,16 @@ export const operationService = {
   },
 
   async createOperation(operation: Operation) {
-    const payload = {
+    const payload: any = {
       operationCode: operation.operationCode,
       operationName: operation.name,
       description: operation.description,
       standardMinuteValue: operation.smv,
       status: operation.status === 'active' ? 'ACTIVE' : 'INACTIVE',
     };
+    if ((operation as any).requiredSkillId) {
+      payload.requiredSkillId = (operation as any).requiredSkillId;
+    }
     const { data } = await apiClient.post<{ success: boolean; data: OperationAPIResponse }>('/operations', payload);
     return mapOperationAPIToUI(data.data);
   },
@@ -58,6 +65,7 @@ export const operationService = {
     if (operation.description !== undefined) payload.description = operation.description;
     if (operation.smv) payload.standardMinuteValue = operation.smv;
     if (operation.status) payload.status = operation.status === 'active' ? 'ACTIVE' : 'INACTIVE';
+    if ((operation as any).requiredSkillId !== undefined) payload.requiredSkillId = (operation as any).requiredSkillId;
 
     const { data } = await apiClient.put<{ success: boolean; data: OperationAPIResponse }>(`/operations/${id}`, payload);
     return mapOperationAPIToUI(data.data);

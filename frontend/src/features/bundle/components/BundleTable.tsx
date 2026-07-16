@@ -18,7 +18,8 @@ import { useBundleStore } from "../store/bundle.store";
 import { useBundles } from "../hooks/useBundles";
 import type { Bundle } from "../types/bundle.types";
 import { BundleStatusBadge, BundleProgressBar } from "./BundleUIHelpers";
-import { Loader2 } from "lucide-react";
+import { Loader2, Radio } from "lucide-react";
+import { BundleIoTSimulatorModal } from "./BundleIoTSimulatorModal";
 
 const columnHelper = createColumnHelper<Bundle>();
 
@@ -26,6 +27,7 @@ export function BundleTable() {
   const { data: bundles = [], isLoading, error } = useBundles();
   const store = useBundleStore();
   const [sorting, setSorting] = useState<{ id: string; desc: boolean }[]>([]);
+  const [simulatingBundle, setSimulatingBundle] = useState<Bundle | null>(null);
 
   const filteredBundles = useMemo(() => {
     return bundles.filter((b) => {
@@ -69,6 +71,7 @@ export function BundleTable() {
         
         return (
           <div className="flex flex-col gap-0.5 text-xs">
+            {o.department ? <span className="text-purple-400 font-semibold">{o.department}</span> : null}
             {o.currentMachine ? <span className="text-emerald-400 font-mono">{o.currentMachine}</span> : <span className="text-white/20">-</span>}
             {o.currentWorker ? <span className="text-white/70">{o.currentWorker}</span> : <span className="text-white/20">-</span>}
           </div>
@@ -88,11 +91,19 @@ export function BundleTable() {
       }
     }),
     columnHelper.accessor("startedTime", {
-      header: "Started",
+      header: "Opened",
       cell: (info) => {
         const val = info.getValue();
         if (!val) return <span className="text-white/20">-</span>;
         return <span className="text-white/60 text-xs">{new Date(val).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'})}</span>;
+      },
+    }),
+    columnHelper.accessor("completedTime", {
+      header: "Closed",
+      cell: (info) => {
+        const val = info.getValue();
+        if (!val) return <span className="text-white/20">-</span>;
+        return <span className="text-emerald-400/80 text-xs font-medium">{new Date(val).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'})}</span>;
       },
     }),
     columnHelper.accessor("status", {
@@ -118,7 +129,13 @@ export function BundleTable() {
               >
                 <Eye className="w-4 h-4 mr-2" /> View Details
               </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+              <DropdownMenuItem 
+                onClick={(e) => { e.stopPropagation(); setSimulatingBundle(info.row.original); }}
+                className="hover:bg-blue-500/20 focus:bg-blue-500/20 text-blue-400 cursor-pointer"
+              >
+                <Radio className="w-4 h-4 mr-2" /> Simulate IoT Scan
+              </DropdownMenuItem>
+              <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer text-white/50">
                 <GitBranch className="w-4 h-4 mr-2" /> Split Bundle
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -215,21 +232,30 @@ export function BundleTable() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            className="p-1 rounded hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
+            className="p-1 rounded bg-zinc-900 border border-white/10 disabled:opacity-30"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 text-white" />
           </button>
+          <span className="text-xs text-white/50">
+            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          </span>
           <button
-            className="p-1 rounded hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
+            className="p-1 rounded bg-zinc-900 border border-white/10 disabled:opacity-30"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4 text-white" />
           </button>
         </div>
       </div>
+      
+      <BundleIoTSimulatorModal 
+        isOpen={simulatingBundle !== null}
+        onClose={() => setSimulatingBundle(null)}
+        bundle={simulatingBundle}
+      />
     </div>
   );
 }

@@ -115,8 +115,14 @@ export function WorkerDetailsDrawer() {
                 <div className="p-4 border border-emerald-500/20 bg-emerald-500/5 rounded-xl">
                   <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Current Assignment</h3>
                   <p className="text-white font-medium">Machine {worker.currentAssignment.machineId}</p>
-                  <p className="text-white/50 text-sm mt-1">Operation: {worker.currentAssignment.operation}</p>
-                  <p className="text-white/30 text-xs mt-3">Assigned at {new Date(worker.currentAssignment.assignedAt).toLocaleTimeString()}</p>
+                  <p className="text-white/50 text-sm mt-2">Operation: <span className="text-white/80">{worker.currentAssignment.operation}</span></p>
+                  {worker.currentAssignment.project && (
+                    <p className="text-white/50 text-sm mt-1">Project: <span className="text-white/80">{worker.currentAssignment.project} ({worker.currentAssignment.productionOrder})</span></p>
+                  )}
+                  {worker.currentAssignment.department && (
+                    <p className="text-white/50 text-sm mt-1">Department: <span className="text-white/80">{worker.currentAssignment.department}</span></p>
+                  )}
+                  <p className="text-white/30 text-xs mt-3 pt-3 border-t border-emerald-500/10">Assigned at {new Date(worker.currentAssignment.assignedAt).toLocaleTimeString()}</p>
                 </div>
               ) : (
                 <div className="text-center py-12 text-white/50 text-sm">

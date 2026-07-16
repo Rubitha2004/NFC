@@ -12,5 +12,7 @@ router.patch("/tasks/:id", planningController.updateTask);
 router.post("/scheduler/auto/:id", planningController.runAutoScheduler);
 router.post("/publish", planningController.publishPlan);
 router.get("/history", planningController.getHistory);
+router.get("/operations/:id/bundles", planningController.getOpenBundles.bind(planningController));
+router.get("/terminals", planningController.getTerminals.bind(planningController));
 
 export const planningRoutes = router;

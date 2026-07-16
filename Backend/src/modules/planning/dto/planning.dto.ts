@@ -44,7 +44,11 @@ export const PublishPlanSchema = z.object({
     rowIndex: z.number().nullable().optional(),
     positionIndex: z.number().nullable().optional()
   })),
-  operations: z.array(z.number()).optional()
+  operations: z.array(z.number()).optional(),
+  operationOrder: z.array(z.object({
+    operationId: z.number(),
+    stepOrder: z.number()
+  })).optional()
 });
 
 export type PublishPlanDTO = z.infer<typeof PublishPlanSchema>;

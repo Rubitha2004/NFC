@@ -58,6 +58,16 @@ export class WorkerRepository {
           assignments: {
             where: { status: "ACTIVE" },
             include: { machine: true, operation: true }
+          },
+          productionTasks: {
+            where: { status: { in: ["ASSIGNED", "RUNNING"] } },
+            include: {
+              productionOrder: true,
+              department: true,
+              operation: true,
+              machine: true
+            },
+            take: 1
           }
         }
       })
@@ -85,6 +95,16 @@ export class WorkerRepository {
         assignments: {
           where: { status: "ACTIVE" },
           include: { machine: true, operation: true }
+        },
+        productionTasks: {
+          where: { status: { in: ["ASSIGNED", "RUNNING"] } },
+          include: {
+            productionOrder: true,
+            department: true,
+            operation: true,
+            machine: true
+          },
+          take: 1
         }
       }
     });

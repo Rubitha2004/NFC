@@ -20,6 +20,7 @@ import tagRoutes from "../modules/tag/routes/tag.routes";
 import stageLogRoutes from "../modules/stage-log/routes/stage-log.routes";
 import qcCheckRoutes from "../modules/qc-check/routes/qc-check.routes";
 import iotRoutes from "../modules/iot/routes/iot.routes";
+import prisma from "../config/prisma";
 
 const router = Router();
 
@@ -43,5 +44,17 @@ router.use("/tags", tagRoutes);
 router.use("/stage-logs", stageLogRoutes);
 router.use("/qc-checks", qcCheckRoutes);
 router.use("/iot", iotRoutes);
+
+// Lightweight skills list — no dedicated module needed yet
+const skillsRouter = Router();
+skillsRouter.get("/", async (_req, res) => {
+  try {
+    const skills = await prisma.skill.findMany({ where: { status: "ACTIVE" }, orderBy: { name: "asc" } });
+    res.json({ data: skills });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+router.use("/skills", skillsRouter);
 
 export default router;

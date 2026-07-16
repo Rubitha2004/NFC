@@ -49,6 +49,16 @@ export class MachineRepository {
           assignments: {
             where: { status: "ACTIVE" },
             include: { worker: true, operation: true, shift: true }
+          },
+          productionTasks: {
+            where: { status: { in: ["ASSIGNED", "RUNNING"] } },
+            include: {
+              productionOrder: true,
+              department: true,
+              operation: true,
+              worker: true
+            },
+            take: 1
           }
         }
       })
@@ -73,6 +83,16 @@ export class MachineRepository {
         assignments: {
           where: { status: "ACTIVE" },
           include: { worker: true, operation: true, shift: true }
+        },
+        productionTasks: {
+          where: { status: { in: ["ASSIGNED", "RUNNING"] } },
+          include: {
+            productionOrder: true,
+            department: true,
+            operation: true,
+            worker: true
+          },
+          take: 1
         }
       }
     });

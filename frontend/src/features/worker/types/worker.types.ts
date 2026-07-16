@@ -44,6 +44,9 @@ export interface WorkerAttendance {
 export interface WorkerAssignment {
   machineId: string;
   operation: string;
+  project?: string;
+  productionOrder?: string;
+  department?: string;
   assignedAt: Date;
   status: "active" | "completed";
 }

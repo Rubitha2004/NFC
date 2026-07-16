@@ -58,15 +58,19 @@ export function useFactoryData(): {
                  checkInTime: new Date().toISOString()
                };
             }
+            const activeTask = m.productionTasks?.[0];
             assignment = {
               id: activeAssignment.id.toString(),
               workerId: activeAssignment.workerId.toString(),
               machineId: activeAssignment.machineId.toString(),
               operationId: activeAssignment.operationId?.toString() || '1',
-              operationName: 'Sewing', 
-              bundleId: '',
-              startedAt: activeAssignment.assignedAt,
-              targetPieces: 100,
+              operationName: activeTask?.operation?.name || activeAssignment.operation?.name || 'Sewing', 
+              projectName: activeTask?.productionOrder?.styleName || 'N/A',
+              productionOrder: activeTask?.productionOrder?.orderNumber || 'N/A',
+              departmentName: activeTask?.department?.name || 'Sewing Line',
+              bundleId: activeTask?.bundleId?.toString() || '',
+              startedAt: activeAssignment.assignedAt || new Date().toISOString(),
+              targetPieces: activeTask?.targetQuantity || 100,
               completedPieces: 0
             };
           }
@@ -89,6 +93,7 @@ export function useFactoryData(): {
             powerStatus: 'on',
             networkStatus: 'online',
             todayTimeline: [],
+            isWorking: m.productionTasks && m.productionTasks.length > 0,
             // Set original indices for reference, row is overridden in rendering but position matches DB
             position: { row: m.rowIndex % 2 === 0 ? 'top' : 'bottom', index: m.positionIndex != null ? m.positionIndex : index }
           };

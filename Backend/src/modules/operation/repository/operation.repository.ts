@@ -34,23 +34,27 @@ export class OperationRepository {
         where,
         skip,
         take: Number(limit),
-        orderBy: {
-          [sortBy]: sortOrder,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          requiredSkill: true,
+          department: true,
         }
       })
     ]);
 
-    return {
-      total,
-      page,
-      limit,
-      data
-    };
+    return { total, page, limit, data };
   }
 
   async findById(id: number) {
     return prisma.operation.findUnique({
       where: { id },
+      include: {
+        requiredSkill: true,
+        department: true,
+        machineOperationAssignments: {
+          include: { machine: true }
+        }
+      }
     });
   }
 

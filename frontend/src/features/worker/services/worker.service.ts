@@ -67,9 +67,12 @@ export const mapWorkerAPIToUI = (data: WorkerAPIResponse): WorkerData => {
     nfcCardId: data.nfcCardId || '',
     currentAssignment: data.assignments && data.assignments.length > 0 ? {
       machineId: data.assignments[0].machine?.machineCode || `MAC-${(data.assignments[0] as any).machineId}`,
-      operation: (data.assignments[0] as any).operation?.operationName || 'Assigned Operation',
+      operation: (data as any).productionTasks?.[0]?.operation?.name || (data.assignments[0] as any).operation?.operationName || 'Assigned Operation',
+      project: (data as any).productionTasks?.[0]?.productionOrder?.styleName || 'N/A',
+      productionOrder: (data as any).productionTasks?.[0]?.productionOrder?.orderNumber || 'N/A',
+      department: (data as any).productionTasks?.[0]?.department?.name || data.department?.name || 'General',
       status: 'active' as const,
-      assignedAt: new Date()
+      assignedAt: new Date(data.assignments[0].assignedAt || new Date())
     } : undefined,
     joiningDate: new Date(data.createdAt),
     status: (data.status?.toLowerCase() || 'active') as WorkerStatus,

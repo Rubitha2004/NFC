@@ -29,12 +29,14 @@ export class IotService {
       if (!assignment) throw new Error(`Worker not actively assigned to machine ${terminal.machine.machineCode}.`);
 
       const operation = assignment.operation;
+
+      // Check for open (Scan Out) or closed (Scan In) log
       const openLog = await tx.bundleStageLog.findFirst({
         where: { bundleId: tag.bundle.id, tagId: tag.id, operationId: operation.id, outTime: null }
       });
 
       if (openLog) {
-        // SCAN OUT
+        // SCAN OUT — close the existing log
         await tx.bundleStageLog.update({ where: { id: openLog.id }, data: { outTime: new Date() } });
 
         // is this the last operation in the route?
@@ -53,28 +55,65 @@ export class IotService {
         const task = await tx.productionTask.findFirst({
           where: { productionOrderId: tag.bundle.productionOrderId, operationId: operation.id }
         });
-        // Increment ProductionTask quantity and check for completion
         if (task) {
           const newCompletedQty = (task.completedQuantity || 0) + tag.bundle.quantity;
           const newStatus = newCompletedQty >= task.targetQuantity ? "COMPLETED" : "RUNNING";
-          
-          await tx.productionTask.update({ 
-            where: { id: task.id }, 
-            data: { 
-              completedQuantity: newCompletedQty,
-              status: newStatus 
-            } 
+          await tx.productionTask.update({
+            where: { id: task.id },
+            data: { completedQuantity: newCompletedQty, status: newStatus }
           });
         }
 
         websocketService.publish(WEBSOCKET_EVENTS.BUNDLE_UPDATED, updatedBundle);
-        return { action: "SCAN_OUT", bundle: tag.bundle.bundleNumber, operation: operation.operationName, movedToQC: isFinalOperation };
+        return {
+          action: "SCAN_OUT",
+          bundle: tag.bundle.bundleNumber,
+          operation: operation.operationName,
+          worker: `${worker.firstName} ${worker.lastName}`,
+          message: `Bundle ${tag.bundle.bundleNumber} scanned OUT from ${operation.operationName}`,
+          movedToQC: isFinalOperation,
+        };
+
       } else {
-        // SCAN IN
-        const newLog = await tx.bundleStageLog.create({
-          data: { bundleId: tag.bundle.id, tagId: tag.id, operationId: operation.id, operatorId: worker.id, inTime: new Date() }
+        // SCAN IN — first enforce sequential gating
+        // Find the previous step (highest displayOrder that is less than this operation's)
+        const prevOperation = await tx.operation.findFirst({
+          where: {
+            id: { not: operation.id },
+            displayOrder: { lt: operation.displayOrder, gte: 1 },
+            productionTasks: {
+              some: { productionOrderId: tag.bundle.productionOrderId }
+            }
+          },
+          orderBy: { displayOrder: 'desc' }
         });
-        
+
+        if (prevOperation) {
+          const prevCompletedLog = await tx.bundleStageLog.findFirst({
+            where: {
+              bundleId: tag.bundle.id,
+              operationId: prevOperation.id,
+              outTime: { not: null }
+            }
+          });
+          if (!prevCompletedLog) {
+            throw new Error(
+              `Sequential gate: This bundle hasn't finished "${prevOperation.operationName}" yet. Complete Step ${prevOperation.displayOrder} first.`
+            );
+          }
+        }
+
+        // Gate passed — create the Scan In log
+        await tx.bundleStageLog.create({
+          data: {
+            bundleId: tag.bundle.id,
+            tagId: tag.id,
+            operationId: operation.id,
+            operatorId: worker.id,
+            inTime: new Date()
+          }
+        });
+
         const task = await tx.productionTask.findFirst({
           where: { productionOrderId: tag.bundle.productionOrderId, operationId: operation.id }
         });
@@ -84,11 +123,24 @@ export class IotService {
 
         const updatedBundle = await tx.bundle.update({
           where: { id: tag.bundle.id },
-          data: { currentOperationId: operation.id, currentMachineId: terminal.machine.id, currentWorkerId: worker.id, status: "IN_PROGRESS" }
+          data: {
+            currentOperationId: operation.id,
+            currentMachineId: terminal.machine.id,
+            currentWorkerId: worker.id,
+            status: "IN_PROGRESS"
+          }
         });
         websocketService.publish(WEBSOCKET_EVENTS.BUNDLE_UPDATED, updatedBundle);
-        return { action: "SCAN_IN", bundle: tag.bundle.bundleNumber, operation: operation.operationName };
+        return {
+          action: "SCAN_IN",
+          bundle: tag.bundle.bundleNumber,
+          operation: operation.operationName,
+          worker: `${worker.firstName} ${worker.lastName}`,
+          message: `Bundle ${tag.bundle.bundleNumber} scanned IN at ${operation.operationName}`,
+        };
       }
     });
   }
 }
+
+export const iotService = new IotService();

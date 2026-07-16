@@ -156,6 +156,9 @@ export interface Assignment {
   machineId: string;
   operationId: string;
   operationName: string;
+  projectName?: string;
+  productionOrder?: string;
+  departmentName?: string;
   bundleId: string;
   startedAt: string; // ISO
   targetPieces: number;
@@ -191,6 +194,7 @@ export interface Machine {
   powerStatus: PowerStatus;    // (v2)
   networkStatus: NetworkStatus;// (v2)
   todayTimeline: TimelineEvent[];
+  isWorking?: boolean;
   // 3D-ready
   position: { row: 'top' | 'bottom'; index: number; x?: number; y?: number; z?: number };
 }

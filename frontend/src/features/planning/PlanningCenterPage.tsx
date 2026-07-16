@@ -1,18 +1,48 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Activity, Play, ArrowRight, Package, Settings2, Layers, Cog, CheckCircle, Wand2, Users, Cpu, ShieldAlert, CheckSquare, Clock } from "lucide-react";
+import { Activity, Play, ArrowRight, Package, Layers, CheckCircle, Wand2, Users, Cpu, ShieldAlert, CheckSquare, Clock, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 import { useProductionOrders } from "../production-order/hooks/useProductionOrderData";
 import { useLivePlanningResources } from "./hooks/useLivePlanningResources";
 import { useOperations } from "../operation/hooks/useOperations";
+import { useOperationBundles } from "./hooks/useOperationBundles";
 import { usePlanningMutations } from "./hooks/usePlanningMutations";
 import { usePlanningDashboard, usePlanningHistory } from "./hooks/usePlanning";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { OrderStatusBadge } from "../production-order/components/ProductionOrderUIHelpers";
 import type { OrderStatus } from "../production-order/types/production-order.types";
-import { CapacityGauge } from "./components/CapacityGauge";
 import { AllocationWizardModal } from "./components/AllocationWizardModal";
 import { BundleTagsModal } from "./components/BundleTagsModal";
+
+function LiveOperationTracker({ operationId }: { operationId: number }) {
+  const { data: openBundles = [] } = useOperationBundles(operationId);
+
+  if (openBundles.length === 0) return null;
+
+  return (
+    <div className="mt-2 bg-black/40 border border-emerald-500/20 rounded-lg p-2.5">
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+          Active Bundles ({openBundles.length})
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {openBundles.map((log: any) => (
+          <div key={log.id} className="bg-zinc-900 border border-white/5 rounded px-2 py-1 flex items-center gap-2 text-xs">
+            <Package className="w-3 h-3 text-emerald-500/70" />
+            <span className="font-mono text-emerald-100">{log.bundle?.bundleNumber}</span>
+            {log.operator && (
+              <span className="text-white/40 border-l border-white/10 pl-2">
+                {log.operator.firstName}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PlanningCenterPage() {
   const { orders, isLoading: loadingOrders } = useProductionOrders();
@@ -24,11 +54,21 @@ export default function PlanningCenterPage() {
 
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [piecesPerBundle, setPiecesPerBundle] = useState<number>(12);
-  const [selectedOperations, setSelectedOperations] = useState<Set<number>>(new Set());
+  // PHASE 2: ordered array instead of Set — preserves step sequence
+  const [selectedOperations, setSelectedOperations] = useState<number[]>([]);
   const [assignments, setAssignments] = useState<Record<number, { machineId: number, workerId: number }[]>>({});
+  
+  // Phase 5: Cache draft data per order to prevent losing work
+  const [drafts, setDrafts] = useState<Record<string, {
+    selectedOperations: number[];
+    assignments: Record<number, { machineId: number, workerId: number }[]>;
+    piecesPerBundle: number;
+  }>>({});
   
   // Drawer state
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
+  // Phase 3: which operation's bundle tracker is expanded
+  const [expandedOperationId, setExpandedOperationId] = useState<number | null>(null);
 
   // Tags Modal state
   const [generatedBundles, setGeneratedBundles] = useState<{ quantity: number }[] | null>(null);
@@ -44,18 +84,45 @@ export default function PlanningCenterPage() {
   }, [orders, selectedOrderId]);
 
   const handleSelectOrder = (id: string) => {
+    if (selectedOrderId) {
+      setDrafts(prev => ({
+        ...prev,
+        [selectedOrderId]: {
+          selectedOperations,
+          assignments,
+          piecesPerBundle
+        }
+      }));
+    }
+
+    const nextDraft = drafts[id];
+    
     setSelectedOrderId(id);
-    setAssignments({});
-    setPiecesPerBundle(12);
-    setSelectedOperations(new Set());
+    setAssignments(nextDraft?.assignments || {});
+    setPiecesPerBundle(nextDraft?.piecesPerBundle || 12);
+    setSelectedOperations(nextDraft?.selectedOperations || []);
     setActiveOperationId(null);
+    setExpandedOperationId(null);
   };
 
   const handleToggleOperation = (opId: number) => {
     setSelectedOperations(prev => {
-      const next = new Set(prev);
-      if (next.has(opId)) next.delete(opId);
-      else next.add(opId);
+      if (prev.includes(opId)) {
+        return prev.filter(id => id !== opId);
+      } else {
+        return [...prev, opId];
+      }
+    });
+  };
+
+  const handleMoveStep = (opId: number, direction: 'up' | 'down') => {
+    setSelectedOperations(prev => {
+      const idx = prev.indexOf(opId);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const swap = direction === 'up' ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
       return next;
     });
   };
@@ -74,7 +141,10 @@ export default function PlanningCenterPage() {
     let machineIndex = 0;
     const usedWorkerIds = new Set<number>();
 
-    const activeOps = operations.filter(op => selectedOperations.has(Number(op.id)));
+    const activeOps = operations
+      .filter(op => selectedOperations.includes(Number(op.id)))
+      // Respect the user-defined order
+      .sort((a, b) => selectedOperations.indexOf(Number(a.id)) - selectedOperations.indexOf(Number(b.id)));
 
     activeOps.forEach(op => {
       const requiredMinutes = Math.ceil(selectedOrder.targetQuantity * (op as any).smv);
@@ -144,7 +214,7 @@ export default function PlanningCenterPage() {
       }
     });
 
-    if (selectedOperations.size === 0) {
+    if (selectedOperations.length === 0) {
       alert("Please define the Operation Routing (Step 1) before publishing.");
       return;
     }
@@ -153,7 +223,9 @@ export default function PlanningCenterPage() {
       productionOrderId: Number(selectedOrder.id),
       bundles,
       assignments: assignmentArray,
-      operations: Array.from(selectedOperations)
+      // Pass operations in step order — backend uses this for displayOrder gating
+      operations: selectedOperations,
+      operationOrder: selectedOperations.map((id, idx) => ({ operationId: id, stepOrder: idx + 1 }))
     }, {
       onSuccess: () => {
         setPublishedOrderNumber(selectedOrder.orderNumber);
@@ -291,6 +363,8 @@ export default function PlanningCenterPage() {
         availableWorkers={filteredWorkers}
         availableMachines={filteredMachines}
         initialAllocations={activeOperationId ? (assignments[activeOperationId] || []) : []}
+        allAssignments={assignments}
+        activeOperationId={activeOperationId}
         onSave={(allocations) => {
           if (activeOperationId) {
             setAssignments(prev => ({
@@ -382,81 +456,124 @@ export default function PlanningCenterPage() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {operations.map(op => {
-                    const isSelected = selectedOperations.has(Number(op.id));
-                    const alloc = assignments[Number(op.id)] || [];
-                    const isMismatched = false; // With explicit pairing, mismatch is impossible
-
-                    return (
-                      <div 
-                        key={op.id}
-                        onClick={() => {
-                          handleToggleOperation(Number(op.id));
-                          if (!isSelected) {
-                             setActiveOperationId(Number(op.id));
-                          } else if (isSelected) {
-                             // If already selected, clicking again could either deselect or just open drawer?
-                             // Let's keep toggle behavior, but if they want to allocate more, they can click a button.
-                          }
-                        }}
-                        className={cn(
-                          "p-3 rounded-xl border cursor-pointer transition-all flex flex-col gap-3 relative",
-                          isSelected 
-                            ? "bg-emerald-500/10 border-emerald-500/50" 
-                            : "bg-zinc-950 border-white/5 hover:border-white/20"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "w-5 h-5 rounded-md flex items-center justify-center border shrink-0",
-                            isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/20 bg-zinc-900"
-                          )}>
-                            {isSelected && <CheckSquare className="w-3 h-3" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className={cn("text-sm font-medium truncate", isSelected ? "text-emerald-400" : "text-white/80")}>
-                              {(op as any).name}
+                {/* Two-panel: pick operations on left, ordered steps on right */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Left: available operations to add */}
+                  <div>
+                    <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Available Operations</p>
+                    <div className="space-y-2">
+                      {operations.map(op => {
+                        const isSelected = selectedOperations.includes(Number(op.id));
+                        return (
+                          <button
+                            key={op.id}
+                            onClick={() => handleToggleOperation(Number(op.id))}
+                            className={cn(
+                              "w-full p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-3 text-left",
+                              isSelected
+                                ? "bg-emerald-500/10 border-emerald-500/50 opacity-60 cursor-default"
+                                : "bg-zinc-950 border-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/5"
+                            )}
+                            disabled={isSelected}
+                          >
+                            <div className={cn(
+                              "w-5 h-5 rounded-md flex items-center justify-center border shrink-0",
+                              isSelected ? "bg-emerald-500 border-emerald-500 text-white" : "border-white/20 bg-zinc-900"
+                            )}>
+                              {isSelected && <CheckCircle className="w-3 h-3" />}
                             </div>
-                            <div className="text-[10px] text-white/40 font-mono">{op.operationCode} | SMV: {(op as any).smv}</div>
-                          </div>
-                          {isSelected && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); setActiveOperationId(Number(op.id)); }}
-                              className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded hover:bg-emerald-500/30 transition-colors"
-                            >
-                              Edit
-                            </button>
-                          )}
-                        </div>
-
-                        {isSelected && (
-                          <div className="flex items-center justify-between border-t border-emerald-500/20 pt-2 mt-1">
-                            <div className="flex items-center gap-3 text-xs">
-                              <div className="flex items-center gap-1 text-emerald-400/80">
-                                <Users className="w-3 h-3" /> {alloc.length}
-                              </div>
-                              <div className="flex items-center gap-1 text-blue-400/80">
-                                <Cpu className="w-3 h-3" /> {alloc.length}
-                              </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate text-white/80">{(op as any).name}</div>
+                              <div className="text-[10px] text-white/40 font-mono">{op.operationCode} | SMV: {(op as any).smv}</div>
                             </div>
-                            {isMismatched && (
-                              <ShieldAlert className="w-4 h-4 text-amber-500" />
+                          </button>
+                        );
+                      })}
+                      {operations.length === 0 && (
+                        <div className="text-center py-4 text-white/40 text-sm">No operations found in the system.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: ordered step sequence */}
+                  <div>
+                    <p className="text-xs text-white/40 uppercase tracking-wider mb-3">Operation Routing Sequence</p>
+                    {selectedOperations.length === 0 ? (
+                      <div className="border-2 border-dashed border-white/10 rounded-xl p-6 text-center text-white/30 text-sm">
+                        <ChevronRight className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                        Click operations on the left to add steps
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedOperations.map((opId, stepIdx) => {
+                          const op = operations.find(o => Number(o.id) === opId);
+                          if (!op) return null;
+                          const alloc = assignments[opId] || [];
+                          return (
+                            <div key={opId}>
+                              <div
+                                className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-3"
+                              >
+                              {/* Step badge */}
+                              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center shrink-0">
+                                {stepIdx + 1}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-emerald-300 truncate">{(op as any).name}</div>
+                                <div className="flex items-center gap-3 mt-0.5">
+                                  <span className="text-[10px] text-white/40 font-mono">{op.operationCode} | SMV: {(op as any).smv}</span>
+                                  <span className="text-[10px] text-emerald-400/70 flex items-center gap-1"><Users className="w-2.5 h-2.5" />{alloc.length} <Cpu className="w-2.5 h-2.5 ml-1" />{alloc.length}</span>
+                                </div>
+                              </div>
+                              {/* Reorder buttons */}
+                              <div className="flex flex-col gap-0.5">
+                                <button
+                                  onClick={() => handleMoveStep(opId, 'up')}
+                                  disabled={stepIdx === 0}
+                                  className="p-0.5 rounded text-white/40 hover:text-white disabled:opacity-20 transition-colors"
+                                  title="Move up"
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleMoveStep(opId, 'down')}
+                                  disabled={stepIdx === selectedOperations.length - 1}
+                                  className="p-0.5 rounded text-white/40 hover:text-white disabled:opacity-20 transition-colors"
+                                  title="Move down"
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                              </div>
+                              {/* Edit allocation */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setActiveOperationId(opId); }}
+                                className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded hover:bg-emerald-500/30 transition-colors"
+                              >
+                                Allocate
+                              </button>
+                              {/* Remove */}
+                              <button
+                                onClick={() => handleToggleOperation(opId)}
+                                className="text-xs text-red-400/70 hover:text-red-400 px-1 py-1 rounded transition-colors"
+                                title="Remove step"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            
+                            {/* Phase 3.4: Live Tracker */}
+                            {selectedOrder.status === 'IN_PROGRESS' && (
+                              <LiveOperationTracker operationId={opId} />
                             )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  
-                  {operations.length === 0 && (
-                    <div className="col-span-full text-center py-4 text-white/40 text-sm">
-                      No operations available in the system.
+                        );
+                      })}
                     </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-                
-                {selectedOperations.size === 0 && operations.length > 0 && (
+
+                {selectedOperations.length === 0 && operations.length > 0 && (
                   <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm flex items-center gap-2">
                     <ShieldAlert className="w-4 h-4" />
                     Please select at least one operation to define the routing plan.

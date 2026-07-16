@@ -29,6 +29,9 @@ export interface MachineAssignment {
   workerId: string;
   workerName: string;
   operation: string;
+  project?: string;
+  productionOrder?: string;
+  department?: string;
   assignedAt: string;
   shift: string;
 }

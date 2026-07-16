@@ -32,6 +32,11 @@ export interface Bundle {
     action: string;
     user: string;
   }[];
+  
+  // Simulator helpers
+  activeTagCode?: string;
+  activeTerminalCode?: string;
+  activeWorkerCardId?: string;
 }
 
 export const bundleSchema = z.object({
@@ -60,9 +65,21 @@ export interface BundleAPI {
   updatedAt: string;
   
   // Relations
-  currentMachine?: { id: number; name: string };
+  currentMachine?: { id: number; name: string; machineCode: string; department?: { name: string } };
   currentOperation?: { id: number; name: string };
-  currentWorker?: { id: number; firstName: string; lastName: string };
+  currentWorker?: { id: number; firstName: string; lastName: string; employeeCode: string; nfcCardId: string; department?: { name: string } };
+  
+  stageLogs?: {
+    id: number;
+    inTime: string;
+    outTime: string | null;
+    operationId: number;
+  }[];
+  
+  tagAssignments?: {
+    tagCode: string;
+    status: string;
+  }[];
 }
 
 export interface BundleQueryParams {

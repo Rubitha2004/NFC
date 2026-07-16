@@ -28,7 +28,7 @@ export const mapBundleAPIToUI = (apiData: BundleAPI): Bundle => {
     bundleNumber: apiData.bundleNumber,
     productionOrder: `PO-${apiData.productionOrderId}`,
     operation: apiData.currentOperation?.name || 'Unassigned',
-    department: 'Sewing', // Ideally fetched from related department
+    department: apiData.currentWorker?.department?.name || apiData.currentMachine?.department?.name || 'Unassigned',
     targetPieces: apiData.quantity,
     completedPieces: apiData.completedQuantity,
     defectivePieces: 0, // Mock fallback for UI
@@ -38,9 +38,14 @@ export const mapBundleAPIToUI = (apiData: BundleAPI): Bundle => {
     currentMachine: apiData.currentMachine?.name,
     priority: "medium" as BundlePriority, // Fallback for now
     status: statusMap[apiData.status] || "in_progress",
-    startedTime: apiData.createdAt,
-    completedTime: apiData.status === 'COMPLETED' ? apiData.updatedAt : undefined,
-    timeline: []
+    startedTime: (apiData.stageLogs && apiData.stageLogs.length > 0) ? apiData.stageLogs[apiData.stageLogs.length - 1].inTime : apiData.createdAt,
+    completedTime: apiData.status === 'COMPLETED' ? apiData.updatedAt : (apiData.stageLogs && apiData.stageLogs.length > 0 && apiData.stageLogs[apiData.stageLogs.length - 1].outTime) ? apiData.stageLogs[apiData.stageLogs.length - 1].outTime : undefined,
+    timeline: [],
+    
+    // Simulator helpers
+    activeTagCode: apiData.tagAssignments?.[0]?.tagCode,
+    activeTerminalCode: (apiData.currentMachine as any)?.terminal?.terminalCode,
+    activeWorkerCardId: apiData.currentWorker?.nfcCardId
   };
 };
 

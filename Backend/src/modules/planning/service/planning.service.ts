@@ -4,14 +4,14 @@ import { CreateTaskDTO, UpdateTaskDTO, PublishPlanDTO } from "../dto/planning.dt
 import { resourceAvailabilityService } from "./resource-availability.service";
 
 export class PlanningService {
-  private async generateUniqueTaskId(tx: any): Promise<string> {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const count = await tx.productionTask.count();
-      const taskId = `TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${(count + 1).toString().padStart(4, '0')}`;
-      const exists = await tx.productionTask.findUnique({ where: { taskId } });
-      if (!exists) return taskId;
+  private async generateUniqueTaskIds(tx: any, count: number): Promise<string[]> {
+    const maxTask = await tx.productionTask.findFirst({ orderBy: { id: 'desc' } });
+    let nextId = (maxTask?.id || 0) + 1;
+    const taskIds = [];
+    for (let i = 0; i < count; i++) {
+      taskIds.push(`TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${(nextId + i).toString().padStart(4, '0')}`);
     }
-    throw new Error("Could not generate a unique task ID, please retry");
+    return taskIds;
   }
 
   private async generateUniqueBundleNumber(tx: any, orderNumber: string): Promise<string> {
@@ -84,7 +84,7 @@ export class PlanningService {
 
   async createTask(data: CreateTaskDTO) {
     return prisma.$transaction(async (tx) => {
-      const taskId = await this.generateUniqueTaskId(tx);
+      const [taskId] = await this.generateUniqueTaskIds(tx, 1);
       
       return tx.productionTask.create({
         data: {
@@ -200,7 +200,9 @@ export class PlanningService {
   }
 
   async publishPlan(data: PublishPlanDTO) {
-    return prisma.$transaction(async (tx) => {
+    let tagUpdatesToPerform: { tagId: number, bundleId: number }[] = [];
+    
+    const result = await prisma.$transaction(async (tx) => {
       const order = await tx.productionOrder.findUnique({
         where: { id: data.productionOrderId },
         include: { bundles: true }
@@ -222,32 +224,31 @@ export class PlanningService {
         }
 
         let currentBundleCount = await tx.bundle.count({ where: { productionOrderId: order.id } });
-
-        for (let i = 0; i < data.bundles.length; i++) {
-          const b = data.bundles[i];
-          currentBundleCount++;
-          const bundleNumber = `${order.orderNumber}-B${currentBundleCount.toString().padStart(3, '0')}`;
-          const safeQuantity = Math.max(1, Math.floor(b.quantity));
-          const bundle = await tx.bundle.create({
-            data: {
-              bundleNumber,
-              productionOrderId: order.id,
-              quantity: safeQuantity,
-              status: "CREATED"
-            }
+        
+        const CHUNK_SIZE = 100;
+        for (let i = 0; i < data.bundles.length; i += CHUNK_SIZE) {
+          const chunkBundles = data.bundles.slice(i, i + CHUNK_SIZE);
+          const chunkTags = availableTags.slice(i, i + CHUNK_SIZE);
+          
+          const createdChunk = await (tx.bundle as any).createManyAndReturn({
+            data: chunkBundles.map(b => {
+              currentBundleCount++;
+              const bundleNumber = `${order.orderNumber}-B${currentBundleCount.toString().padStart(3, '0')}`;
+              return {
+                bundleNumber,
+                productionOrderId: order.id,
+                quantity: Math.max(1, Math.floor(b.quantity)),
+                status: "CREATED"
+              };
+            })
           });
-          newBundles.push(bundle);
-
-          await tx.bundleTagAssignment.update({
-             where: { id: availableTags[i].id },
-             data: {
-                bundleId: bundle.id,
-                status: "ASSIGNED",
-                assignedAt: new Date(),
-                releasedAt: null,
-                assignedBy: "System Planner"
-             }
-          });
+          
+          newBundles.push(...createdChunk);
+          
+          tagUpdatesToPerform.push(...createdChunk.map((bundle: any, idx: number) => ({
+            tagId: chunkTags[idx].id,
+            bundleId: bundle.id
+          })));
         }
       }
 
@@ -259,50 +260,94 @@ export class PlanningService {
       }
 
       const createdAssignments = [];
-      for (const a of data.assignments) {
-        const shiftId = a.shiftId || defaultShiftId;
-        if (!shiftId) throw new Error("No active shift found for assignment");
+      if (data.assignments && data.assignments.length > 0) {
+        const machineIds = data.assignments.map(a => a.machineId);
+        const workerIds = data.assignments.map(a => a.workerId);
         
-        // Gracefully release any prior active assignments for this machine
-        await tx.assignment.updateMany({
-            where: { machineId: a.machineId, status: 'ACTIVE' },
+        await Promise.all([
+          tx.assignment.updateMany({
+            where: { machineId: { in: machineIds }, status: 'ACTIVE' },
             data: { status: 'COMPLETED', releasedAt: new Date() }
-        });
-
-        // Release worker's prior active assignment
-        await tx.assignment.updateMany({
-            where: { workerId: a.workerId, status: 'ACTIVE' },
+          }),
+          tx.assignment.updateMany({
+            where: { workerId: { in: workerIds }, status: 'ACTIVE' },
             data: { status: 'COMPLETED', releasedAt: new Date() }
-        });
+          })
+        ]);
 
-        if (a.roomId !== undefined && a.rowIndex !== undefined && a.positionIndex !== undefined) {
-           await tx.machine.update({
-             where: { id: a.machineId },
-             data: {
-               roomId: a.roomId,
-               rowIndex: a.rowIndex,
-               positionIndex: a.positionIndex
-             }
-           });
+        const validAssignments = data.assignments.filter(a => a.roomId !== undefined && a.rowIndex !== undefined && a.positionIndex !== undefined);
+        
+        if (validAssignments.length > 0) {
+           // Deduplicate to ensure no seat is claimed twice and no machine is moved twice
+           const machineMap = new Map();
+           for (const a of validAssignments) {
+              machineMap.set(a.machineId, a);
+           }
+           
+           const seatMap = new Map();
+           for (const a of Array.from(machineMap.values())) {
+              const seatKey = `${a.roomId}-${a.rowIndex}-${a.positionIndex}`;
+              // If multiple machines aim for the same seat, the last one wins
+              seatMap.set(seatKey, a);
+           }
+           
+           // We only care about the latest intended location for each seat
+           const finalUpdates = Array.from(seatMap.values());
+           
+           const clearPromises = finalUpdates.map(a => 
+             tx.machine.updateMany({
+                where: {
+                  roomId: a.roomId,
+                  rowIndex: a.rowIndex,
+                  positionIndex: a.positionIndex
+                },
+                data: {
+                  roomId: null,
+                  rowIndex: null,
+                  positionIndex: null
+                }
+             })
+           );
+           await Promise.all(clearPromises);
+
+           const machineUpdatePromises = finalUpdates.map(a => 
+             tx.machine.update({
+               where: { id: a.machineId },
+               data: { roomId: a.roomId, rowIndex: a.rowIndex, positionIndex: a.positionIndex }
+             })
+           );
+           await Promise.all(machineUpdatePromises);
         }
+
+        const assignmentData = data.assignments.map(a => ({
+          operationId: a.operationId,
+          workerId: a.workerId,
+          machineId: a.machineId,
+          shiftId: a.shiftId || defaultShiftId!,
+          status: "ACTIVE" as const,
+          assignedBy: "System Planner"
+        }));
         
-        const assignment = await tx.assignment.create({
-          data: {
-            operationId: a.operationId,
-            workerId: a.workerId,
-            machineId: a.machineId,
-            shiftId,
-            status: "ACTIVE" as const,
-            assignedBy: "System Planner"
-          }
-        });
-        createdAssignments.push(assignment);
+        await tx.assignment.createMany({ data: assignmentData });
+        // Prisma doesn't return created records for createMany in older versions, so we just add the count
+        createdAssignments.push(...assignmentData);
       }
 
       // 2.5 Create Production Tasks for the Planning Board
       if (data.operations && data.operations.length > 0) {
         const defaultDept = await tx.department.findFirst();
         const deptId = defaultDept?.id || 1;
+        
+        let totalTasksNeeded = 0;
+        data.operations.forEach(opId => {
+          const assignmentsForOp = data.assignments.filter(a => a.operationId === opId);
+          totalTasksNeeded += Math.max(1, assignmentsForOp.length);
+        });
+        
+        const generatedTaskIds = await this.generateUniqueTaskIds(tx, totalTasksNeeded);
+        let idIndex = 0;
+        
+        const taskData = [];
         
         for (const opId of data.operations) {
           const assignmentsForOp = data.assignments.filter(a => a.operationId === opId);
@@ -311,42 +356,53 @@ export class PlanningService {
 
           if (assignmentsForOp.length > 0) {
             for (const assignment of assignmentsForOp) {
-              const taskId = await this.generateUniqueTaskId(tx);
+              const taskId = generatedTaskIds[idIndex++];
               const splitQuantity = Math.max(1, Math.ceil(order.plannedQuantity / assignmentsForOp.length));
               const splitTime = Math.max(1, Math.ceil(estimatedTime / assignmentsForOp.length));
               
-              await tx.productionTask.create({
-                data: {
-                  taskId,
-                  productionOrderId: order.id,
-                  operationId: opId,
-                  departmentId: deptId,
-                  machineId: assignment.machineId,
-                  workerId: assignment.workerId,
-                  shiftId: assignment.shiftId || defaultShiftId,
-                  targetQuantity: splitQuantity,
-                  estimatedTime: splitTime,
-                  status: "ASSIGNED",
-                  priority: order.priority
-                }
+              taskData.push({
+                taskId,
+                productionOrderId: order.id,
+                operationId: opId,
+                departmentId: deptId,
+                machineId: assignment.machineId,
+                workerId: assignment.workerId,
+                shiftId: assignment.shiftId || defaultShiftId,
+                targetQuantity: splitQuantity,
+                estimatedTime: splitTime,
+                status: "ASSIGNED" as const,
+                priority: order.priority
               });
             }
           } else {
-            const taskId = await this.generateUniqueTaskId(tx);
-            await tx.productionTask.create({
-              data: {
+            const taskId = generatedTaskIds[idIndex++];
+            taskData.push({
                 taskId,
                 productionOrderId: order.id,
                 operationId: opId,
                 departmentId: deptId,
                 targetQuantity: order.plannedQuantity,
                 estimatedTime,
-                status: "PLANNED",
+                status: "PLANNED" as const,
                 priority: order.priority
-              }
             });
           }
         }
+        
+        if (taskData.length > 0) {
+          await tx.productionTask.createMany({ data: taskData });
+        }
+      }
+
+      // 2.6 Write the step order back to the Operations for sequential gating
+      if (data.operationOrder && data.operationOrder.length > 0) {
+        const opUpdates = data.operationOrder.map(opOrder => 
+          tx.operation.update({
+            where: { id: opOrder.operationId },
+            data: { displayOrder: opOrder.stepOrder }
+          })
+        );
+        await Promise.all(opUpdates);
       }
 
       // 3. Mark Production Order as IN_PROGRESS or PLANNED
@@ -364,15 +420,35 @@ export class PlanningService {
         assignmentsCreated: createdAssignments.length
       };
     }, { timeout: 30000, isolationLevel: 'Serializable' });
+
+    // After successful transaction, quickly perform all tag updates concurrently using pool connections
+    if (tagUpdatesToPerform.length > 0) {
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < tagUpdatesToPerform.length; i += CHUNK_SIZE) {
+        const chunk = tagUpdatesToPerform.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(update => 
+          prisma.bundleTagAssignment.update({
+            where: { id: update.tagId },
+            data: {
+              bundleId: update.bundleId,
+              status: "ASSIGNED",
+              assignedAt: new Date(),
+              releasedAt: null,
+              assignedBy: "System Planner"
+            }
+          })
+        ));
+      }
+    }
+    
+    return result;
   }
 
   async getHistory() {
     return prisma.bundleStageLog.findMany({
       include: {
         bundle: {
-          include: {
-            productionOrder: true
-          }
+          include: { productionOrder: true }
         },
         tag: true,
         operation: true,
@@ -380,6 +456,32 @@ export class PlanningService {
       },
       orderBy: { createdAt: "desc" },
       take: 100
+    });
+  }
+
+  /** Phase 3 — Per-operation live bundle tracker */
+  async getOpenBundlesForOperation(operationId: number) {
+    const openLogs = await prisma.bundleStageLog.findMany({
+      where: { operationId, outTime: null },
+      include: {
+        bundle: {
+          include: {
+            productionOrder: true,
+            tagAssignments: { where: { status: 'ASSIGNED' }, take: 1 },
+          }
+        },
+        tag: true,
+        operator: true,
+      },
+      orderBy: { inTime: 'asc' },
+    });
+    return openLogs;
+  }
+
+  async getTerminals() {
+    return prisma.terminal.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: { terminalCode: 'asc' }
     });
   }
 }

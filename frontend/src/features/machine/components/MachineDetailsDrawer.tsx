@@ -300,12 +300,30 @@ export function MachineDetailsDrawer() {
               </h3>
               <div className="p-4 border border-border/40 rounded-xl bg-muted/10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-muted-foreground">
-                    Operation:{" "}
-                    <span className="text-foreground">
-                      {machine.currentOperation ?? "—"}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm text-muted-foreground">
+                      Operation:{" "}
+                      <span className="text-foreground">
+                        {machine.currentAssignment?.operation ?? machine.currentOperation ?? "—"}
+                      </span>
                     </span>
-                  </span>
+                    {machine.currentAssignment?.project && (
+                      <span className="text-sm text-muted-foreground">
+                        Project:{" "}
+                        <span className="text-foreground">
+                          {machine.currentAssignment.project} ({machine.currentAssignment.productionOrder})
+                        </span>
+                      </span>
+                    )}
+                    {machine.currentAssignment?.department && (
+                      <span className="text-sm text-muted-foreground">
+                        Department:{" "}
+                        <span className="text-foreground">
+                          {machine.currentAssignment.department}
+                        </span>
+                      </span>
+                    )}
+                  </div>
                   <Badge
                     variant="outline"
                     className={cn(
