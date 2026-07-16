@@ -11,9 +11,28 @@ export class DashboardRepository {
     const startOfToday = this.getStartOfToday();
     const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
 
+    // 1. Get all attendances today to determine truly present workers
+    const todaysAttendances = await prisma.attendance.findMany({
+      where: { tapTime: { gte: startOfToday } },
+      orderBy: { tapTime: 'desc' },
+      select: { workerId: true, attendanceType: true }
+    });
+    
+    const latestTapByWorker = new Map<number, string>();
+    for (const a of todaysAttendances) {
+      if (!latestTapByWorker.has(a.workerId)) {
+        latestTapByWorker.set(a.workerId, a.attendanceType);
+      }
+    }
+    
+    const presentWorkerIds = Array.from(latestTapByWorker.entries())
+      .filter(([_, type]) => type === 'IN')
+      .map(([id, _]) => id);
+
+    // 2. Query the rest of the metrics
     const [
       totalWorkers,
-      presentWorkersRecords,
+      activeWorkersCount,
       activeAssignments,
       totalMachines,
       offlineTerminals,
@@ -24,10 +43,11 @@ export class DashboardRepository {
     ] = await prisma.$transaction([
       // Worker summary metrics
       prisma.worker.count({ where: { status: 'ACTIVE' } }),
-      prisma.attendance.groupBy({
-        by: ['workerId'],
-        where: { tapTime: { gte: startOfToday } },
-        orderBy: { workerId: 'asc' }
+      prisma.assignment.count({ 
+        where: { 
+          status: 'ACTIVE',
+          workerId: { in: presentWorkerIds }
+        } 
       }),
       // Shared active metrics (running machines = active assignments)
       prisma.assignment.count({ where: { status: 'ACTIVE' } }),
@@ -69,7 +89,8 @@ export class DashboardRepository {
 
     return {
       totalWorkers,
-      presentWorkersCount: presentWorkersRecords.length,
+      presentWorkersCount: presentWorkerIds.length,
+      activeWorkersCount,
       activeAssignments,
       totalMachines,
       offlineTerminals,

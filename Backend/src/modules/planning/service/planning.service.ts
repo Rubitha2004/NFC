@@ -2,6 +2,8 @@ import prisma from "../../../config/prisma";
 import { TaskStatus } from "@prisma/client";
 import { CreateTaskDTO, UpdateTaskDTO, PublishPlanDTO } from "../dto/planning.dto";
 import { resourceAvailabilityService } from "./resource-availability.service";
+import { validateAssignmentInput } from "../../assignment/service/assignment.service";
+import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
 
 export class PlanningService {
   private async generateUniqueTaskIds(tx: any, count: number): Promise<string[]> {
@@ -164,12 +166,6 @@ export class PlanningService {
       const hasRequiredSkill = w.skills.some(s => s.skillId === task.operation.requiredSkillId);
       if (hasRequiredSkill) score += 50;
 
-      // Deduct points if they have active assignments (load balancing)
-      // Since getAvailableWorkers filters out active assignments, they should all be 0 here,
-      // but in a real system we'd check their total assigned tasks for the day.
-      const taskLoad = 0; // w.productionTasks?.length || 0;
-      score -= taskLoad * 5;
-
       return { worker: w, score };
     }).sort((a, b) => b.score - a.score);
 
@@ -327,6 +323,24 @@ export class PlanningService {
           status: "ACTIVE" as const,
           assignedBy: "System Planner"
         }));
+
+        // Validate all assignments
+        const errors = [];
+        for (const a of assignmentData) {
+          try {
+            await validateAssignmentInput(tx, {
+              workerId: a.workerId,
+              machineId: a.machineId,
+              operationId: a.operationId,
+              shiftId: a.shiftId,
+            });
+          } catch (err: any) {
+            errors.push(err.message);
+          }
+        }
+        if (errors.length > 0) {
+          throw new Error(`Plan validation failed:\n${errors.join('\n')}`);
+        }
         
         await tx.assignment.createMany({ data: assignmentData });
         // Prisma doesn't return created records for createMany in older versions, so we just add the count
@@ -417,7 +431,8 @@ export class PlanningService {
         success: true,
         message: "Plan published successfully to IoT terminals",
         bundlesCreated: newBundles.length,
-        assignmentsCreated: createdAssignments.length
+        assignmentsCreated: createdAssignments.length,
+        createdAssignments: createdAssignments
       };
     }, { timeout: 30000, isolationLevel: 'Serializable' });
 
@@ -439,6 +454,14 @@ export class PlanningService {
           })
         ));
       }
+    }
+
+    if (result.createdAssignments && result.createdAssignments.length > 0) {
+      result.createdAssignments.forEach((assignment: any) => {
+        websocketService.publish(WEBSOCKET_EVENTS.ASSIGNMENT_CREATED, assignment);
+      });
+      // Remove it from the final result sent to the client to save bandwidth
+      delete (result as any).createdAssignments;
     }
     
     return result;

@@ -373,8 +373,8 @@ function MachineNode({ label, number, machine, search }: { label: string, number
   );
 
   // Determine States based on Real Data
-  const isOffline = machine.status === 'offline' || machine.status === 'maintenance';
-  const hasWorker = !!machine.worker;
+  const isOffline = machine?.status === 'offline' || machine?.status === 'maintenance';
+  const hasWorker = !!machine?.worker;
   
   if (!machine || (!hasWorker && !isOffline)) {
     return (

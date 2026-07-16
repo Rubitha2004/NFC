@@ -5,6 +5,7 @@ export class ResourceAvailabilityService {
     return prisma.worker.findMany({
       where: {
         status: "ACTIVE",
+        assignments: { none: { status: "ACTIVE" } },
         ...(opts?.departmentId ? { departmentId: opts.departmentId } : {}),
         ...(opts?.requiredSkillId
           ? { skills: { some: { skillId: opts.requiredSkillId } } }
@@ -24,6 +25,7 @@ export class ResourceAvailabilityService {
     return prisma.machine.findMany({
       where: {
         status: "ACTIVE",
+        assignments: { none: { status: "ACTIVE" } },
         ...(opts?.departmentId ? { departmentId: opts.departmentId } : {}),
       },
       include: { 

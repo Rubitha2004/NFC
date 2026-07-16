@@ -8,6 +8,31 @@ import { ShiftRepository } from "../../shift/repository/shift.repository";
 import { RecordStatus, AssignmentStatus } from "@prisma/client";
 import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
 
+export async function validateAssignmentInput(tx: any, data: { workerId: number, machineId: number, operationId: number, shiftId: number }) {
+  const [worker, machine, operation, shift] = await Promise.all([
+    tx.worker.findUnique({ where: { id: data.workerId } }),
+    tx.machine.findUnique({ where: { id: data.machineId } }),
+    tx.operation.findUnique({ where: { id: data.operationId }, include: { requiredSkill: true } }),
+    tx.shift.findUnique({ where: { id: data.shiftId } }),
+  ]);
+
+  if (!worker || worker.status !== RecordStatus.ACTIVE) throw new Error(`Worker (ID ${data.workerId}) not found or not active`);
+  if (!machine || machine.status !== RecordStatus.ACTIVE) throw new Error(`Machine (ID ${data.machineId}) not found or not active`);
+  if (!operation || operation.status !== RecordStatus.ACTIVE) throw new Error(`Operation (ID ${data.operationId}) not found or not active`);
+  if (!shift || shift.status !== RecordStatus.ACTIVE) throw new Error(`Shift (ID ${data.shiftId}) not found or not active`);
+
+  if (operation.requiredSkillId) {
+    const hasSkill = await tx.workerSkill.findUnique({
+      where: { workerId_skillId: { workerId: data.workerId, skillId: operation.requiredSkillId } }
+    });
+    if (!hasSkill) {
+      throw new Error(
+        `Assignment invalid for worker ${worker.firstName} ${worker.lastName}: missing required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`
+      );
+    }
+  }
+}
+
 export class AssignmentService {
   private assignmentRepo: AssignmentRepository;
   private workerRepo: WorkerRepository;
@@ -25,28 +50,7 @@ export class AssignmentService {
 
   async createAssignment(data: CreateAssignmentDto) {
     return prisma.$transaction(async (tx) => {
-      const [worker, machine, operation, shift] = await Promise.all([
-        tx.worker.findUnique({ where: { id: data.workerId } }),
-        tx.machine.findUnique({ where: { id: data.machineId } }),
-        tx.operation.findUnique({ where: { id: data.operationId }, include: { requiredSkill: true } }),
-        tx.shift.findUnique({ where: { id: data.shiftId } }),
-      ]);
-
-      if (!worker || worker.status !== RecordStatus.ACTIVE) throw new Error("Worker not found or not active");
-      if (!machine || machine.status !== RecordStatus.ACTIVE) throw new Error("Machine not found or not active");
-      if (!operation || operation.status !== RecordStatus.ACTIVE) throw new Error("Operation not found or not active");
-      if (!shift || shift.status !== RecordStatus.ACTIVE) throw new Error("Shift not found or not active");
-
-      if (operation.requiredSkillId) {
-        const hasSkill = await tx.workerSkill.findUnique({
-          where: { workerId_skillId: { workerId: data.workerId, skillId: operation.requiredSkillId } }
-        });
-        if (!hasSkill) {
-          throw new Error(
-            `Worker does not have the required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`
-          );
-        }
-      }
+      await validateAssignmentInput(tx, data);
 
       // reject if machine already occupied THIS shift — locked inside the same tx
       const machineBusy = await tx.assignment.findFirst({
@@ -55,6 +59,8 @@ export class AssignmentService {
       if (machineBusy) throw new Error("Machine is already assigned in this shift");
 
       // release worker's existing active assignment
+      // Note: Worker assignments are released globally across ALL shifts (not per-shift like machines)
+      // This enforces a strict "one active assignment total" rule for workers, regardless of shift.
       await tx.assignment.updateMany({
         where: { workerId: data.workerId, status: AssignmentStatus.ACTIVE },
         data: { status: AssignmentStatus.COMPLETED, releasedAt: new Date() }

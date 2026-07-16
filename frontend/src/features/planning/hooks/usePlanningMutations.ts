@@ -32,6 +32,7 @@ export function usePlanningMutations() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['planning'] });
       queryClient.invalidateQueries({ queryKey: ['production-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['workers'] });
     },
   });
 
