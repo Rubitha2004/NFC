@@ -23,7 +23,7 @@ export class IotController {
 
   async getDemoData(req: Request, res: Response): Promise<any> {
     try {
-      const machineIdentifier = req.params.machineId;
+      const machineIdentifier = req.params.machineId as string;
       if (!machineIdentifier) throw new Error("Invalid machine ID");
       const data = await service.getDemoData(machineIdentifier);
       return res.json({ success: true, data });
