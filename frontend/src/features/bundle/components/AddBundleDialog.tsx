@@ -18,7 +18,7 @@ export function AddBundleDialog() {
   const store = useBundleStore();
   const { create } = useBundleMutations();
   const { data: posData = [] } = useProductionOrders();
-  const { data: opsData = [] } = useOperations();
+  const { data: opsData = [] } = useOperations({ status: 'ACTIVE' });
   
   const POS = posData.map(p => p.orderNumber);
   const OPERATIONS = opsData.map(o => o.name);

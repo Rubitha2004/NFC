@@ -15,6 +15,7 @@ export const createMachineSchema = z.object({
 });
 
 export const updateMachineSchema = z.object({
+  machineCode: z.string().min(1).optional(),
   machineName: z.string().min(1).optional(),
   departmentId: z.number().int().positive().optional(),
   machineTypeId: z.number().int().positive().optional(),
@@ -23,6 +24,7 @@ export const updateMachineSchema = z.object({
   roomId: z.number().int().optional().nullable(),
   rowIndex: z.number().int().optional().nullable(),
   positionIndex: z.number().int().optional().nullable(),
+  status: z.nativeEnum(RecordStatus).optional(),
 });
 
 export const changeMachineStatusSchema = z.object({

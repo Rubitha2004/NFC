@@ -37,7 +37,7 @@ export function AllocationWizardModal({
   const [selectedMachineForSeat, setSelectedMachineForSeat] = useState<PlanningMachine | null>(null);
   
   // Factory Layout integration
-  const { config, loading: loadingLayout } = useFactoryData();
+  const { config, loading: loadingLayout, allMachines } = useFactoryData();
   const floors = config?.buildings?.[0]?.floors || [];
   
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export function AllocationWizardModal({
   useEffect(() => {
     if (isOpen) {
       // Map initial allocations if they have positional data
-      const mapped = initialAllocations.filter(a => a.roomId !== undefined).map(a => ({
+      const mapped = initialAllocations.filter(a => a.roomId !== undefined && a.roomId !== null).map(a => ({
          machineId: a.machineId,
          workerId: a.workerId,
          roomId: a.roomId!,
@@ -283,8 +283,8 @@ export function AllocationWizardModal({
                               }
 
                               // Check if seat is physically occupied by a busy machine from DB
-                              const physicalMachine = availableMachines.find(m => String(m.roomId) === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
-                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignments && physicalMachine.assignments.length > 0);
+                              const physicalMachine = allMachines.find(m => m.roomId === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
+                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignment);
                               
                               const isUnavailable = isGloballyAssigned || isPhysicallyBusy;
 
@@ -327,8 +327,8 @@ export function AllocationWizardModal({
                                 });
                               }
 
-                              const physicalMachine = availableMachines.find(m => String(m.roomId) === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
-                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignments && physicalMachine.assignments.length > 0);
+                              const physicalMachine = allMachines.find(m => m.roomId === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
+                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignment);
                               
                               const isUnavailable = isGloballyAssigned || isPhysicallyBusy;
 
@@ -568,7 +568,7 @@ export function AllocationWizardModal({
 function MachineNode({ 
   label, isSelected, isGloballyAssigned, assignedMachine, assignedWorker, physicalMachine, isPhysicallyBusy, onClick 
 }: { 
-  label: string, isSelected: boolean, isGloballyAssigned?: boolean, assignedMachine?: PlanningMachine, assignedWorker?: PlanningWorker, physicalMachine?: PlanningMachine, isPhysicallyBusy?: boolean, onClick: () => void 
+  label: string, isSelected: boolean, isGloballyAssigned?: boolean, assignedMachine?: PlanningMachine, assignedWorker?: PlanningWorker, physicalMachine?: any, isPhysicallyBusy?: boolean, onClick: () => void 
 }) {
   const statusColor = isGloballyAssigned
     ? 'border-red-500/50 bg-red-500/10 opacity-80 cursor-not-allowed shadow-[0_0_15px_rgba(239,68,68,0.1)]'

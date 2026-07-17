@@ -30,7 +30,8 @@ export const updateWorkerSchema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   dateOfBirth: z.string().optional().transform(val => val ? new Date(val) : undefined),
   joiningDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
-  remarks: z.string().optional()
+  remarks: z.string().optional(),
+  status: z.nativeEnum(RecordStatus).optional(),
 });
 
 export const changeWorkerStatusSchema = z.object({

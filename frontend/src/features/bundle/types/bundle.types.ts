@@ -65,7 +65,7 @@ export interface BundleAPI {
   updatedAt: string;
   
   // Relations
-  currentMachine?: { id: number; name: string; machineCode: string; department?: { name: string } };
+  currentMachine?: { id: number; machineName: string; machineCode: string; department?: { name: string } };
   currentOperation?: { id: number; name: string };
   currentWorker?: { id: number; firstName: string; lastName: string; employeeCode: string; nfcCardId: string; department?: { name: string } };
   

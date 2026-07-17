@@ -20,7 +20,7 @@ export function AddInspectionDialog() {
   const { create } = useQCMutations();
   
   const { data: bundlesData = [] } = useBundles();
-  const { data: opsData = [] } = useOperations();
+  const { data: opsData = [] } = useOperations({ status: 'ACTIVE' });
   const { data: workersData = [] } = useWorkers();
 
   const BUNDLES = bundlesData.map(b => b.bundleNumber);

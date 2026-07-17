@@ -141,6 +141,56 @@ export class IotService {
       }
     });
   }
+
+  /**
+   * Fetches valid mock data for testing IoT interactions from the frontend.
+   */
+  async getDemoData(machineIdentifier: string) {
+    const idNum = parseInt(machineIdentifier, 10);
+    const machine = await prisma.machine.findFirst({
+      where: {
+        OR: [
+          { machineCode: machineIdentifier },
+          ...(isNaN(idNum) ? [] : [{ id: idNum }])
+        ]
+      },
+      include: {
+        terminal: true,
+        assignments: {
+          where: { status: 'ACTIVE' },
+          include: { worker: true, operation: true }
+        }
+      }
+    });
+
+    if (!machine) throw new Error("Machine not found");
+    if (!machine.terminal) throw new Error("No terminal mapped to this machine.");
+    if (machine.assignments.length === 0) throw new Error("No worker assigned to this machine.");
+
+    const assignment = machine.assignments[0];
+    const workerCardId = assignment.worker.nfcCardId;
+    const terminalCode = machine.terminal.terminalCode;
+
+    // Find an available bundle tag
+    // We try to find one that is assigned to a bundle that hasn't completed
+    const tag = await prisma.bundleTagAssignment.findFirst({
+      where: {
+        status: 'ASSIGNED',
+        bundleId: { not: null }
+      },
+      include: { bundle: true }
+    });
+
+    if (!tag) throw new Error("No active bundle tags found to simulate a scan.");
+
+    return {
+      terminalCode,
+      workerCardId,
+      tagCode: tag.tagCode,
+      bundleNumber: tag.bundle?.bundleNumber,
+      workerName: `${assignment.worker.firstName} ${assignment.worker.lastName}`
+    };
+  }
 }
 
 export const iotService = new IotService();

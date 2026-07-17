@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Cpu,
   HeartPulse,
@@ -23,6 +24,7 @@ import { StatusBadge, HealthBadge, MachineAvatar } from "./MachineUIHelpers";
 import type { MachineTimelineEvent } from "../types/machine.types";
 import { DetailsDrawer } from "@/shared/components/ui/DetailsDrawer";
 import { Loader2 } from "lucide-react";
+import api from "@/services/axios";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -107,6 +109,67 @@ function TimelineIcon({ type }: { type: MachineTimelineEvent["type"] }) {
   );
 }
 
+// ─── IoT Demo Panel ─────────────────────────────────────────────────────────────
+function IotDemoPanel({ machineId }: { machineId: string }) {
+  const [loading, setLoading] = useState(false);
+  const [log, setLog] = useState<string>("");
+
+  const handleSimulate = async () => {
+    setLoading(true);
+    setLog("Fetching demo mock data...");
+    try {
+      // 1. Fetch valid mock IoT data from our new helper endpoint
+      const { data: demoRes } = await api.get(`/iot/demo-data/${machineId}`);
+      if (!demoRes.success) throw new Error(demoRes.error || "Failed to fetch demo data");
+
+      const demoData = demoRes.data;
+      setLog(`Found worker: ${demoData.workerName}\nTerminal: ${demoData.terminalCode}\nTag: ${demoData.tagCode}\nSimulating IoT Scan...`);
+
+      // 2. Trigger the actual production endpoint
+      const { data: scanRes } = await api.post("/iot/scan", {
+        tagCode: demoData.tagCode,
+        workerCardId: demoData.workerCardId,
+        terminalCode: demoData.terminalCode
+      });
+
+      if (!scanRes.success) throw new Error(scanRes.error || "Scan failed");
+
+      setLog(prev => prev + `\n\nSuccess! Action: ${scanRes.data.action}\n${scanRes.data.message}`);
+    } catch (err: any) {
+      setLog(prev => prev + `\n\nError: ${err.response?.data?.error || err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <section>
+        <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
+          <Zap className="w-3 h-3 text-amber-500" /> Demo IoT Scanner
+        </h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          This panel simulates a real NFC scan on the factory floor. It will fetch an available bundle tag, find the assigned worker's ID card, and simulate a terminal scan.
+        </p>
+        <button 
+          onClick={handleSimulate}
+          disabled={loading}
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all flex items-center justify-center gap-2"
+        >
+          {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Package className="w-5 h-5" />}
+          {loading ? "Simulating..." : "Simulate ID / Bundle Scan"}
+        </button>
+
+        {log && (
+          <div className="mt-6 bg-black/40 border border-border/40 p-4 rounded-xl font-mono text-xs text-emerald-400 whitespace-pre-wrap">
+            {log}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ─── Main Drawer ──────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -116,11 +179,21 @@ const TABS = [
   { id: "assignments", label: "Assignments", icon: Users },
   { id: "production", label: "Production", icon: BarChart2 },
   { id: "timeline", label: "Timeline", icon: Clock },
+  { id: "iot-demo", label: "IoT Demo", icon: Zap },
 ];
 
 export function MachineDetailsDrawer() {
   const store = useMachineStore();
   const { data: machine, isLoading } = useMachine(store.selectedMachineId);
+  const [hideIotDemo, setHideIotDemo] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setHideIotDemo(localStorage.getItem("hideIotDemo") === "true");
+    }
+  }, []);
+
+  const activeTabs = TABS.filter(t => !hideIotDemo || t.id !== "iot-demo");
 
   if (!store.isDrawerOpen) return null;
 
@@ -174,7 +247,7 @@ export function MachineDetailsDrawer() {
       {/* Tabs */}
       <div className="border-b border-border/40 flex-shrink-0 px-4 bg-muted/20">
         <div className="flex overflow-x-auto hide-scrollbar gap-1">
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {activeTabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => store.setDrawerTab(id)}
@@ -797,6 +870,25 @@ export function MachineDetailsDrawer() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── IOT DEMO TAB ─────────────────────────────────── */}
+        {store.drawerTab === "iot-demo" && !hideIotDemo && (
+          <div className="space-y-4">
+             <div className="flex justify-end">
+                <button 
+                  onClick={() => {
+                     localStorage.setItem("hideIotDemo", "true");
+                     setHideIotDemo(true);
+                     store.setDrawerTab("overview");
+                  }}
+                  className="text-xs text-red-400 hover:text-red-300 bg-red-500/10 px-3 py-1.5 rounded border border-red-500/20 transition-colors"
+                >
+                  Remove IoT Demo Option
+                </button>
+             </div>
+             <IotDemoPanel machineId={machine.id} />
           </div>
         )}
       </div>

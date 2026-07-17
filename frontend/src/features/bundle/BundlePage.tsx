@@ -1,7 +1,7 @@
 import { BundleHeader } from "./components/BundleHeader";
 import { BundleKPIs } from "./components/BundleKPIs";
 import { BundleFilter } from "./components/BundleFilter";
-import { BundleTable } from "./components/BundleTable";
+import { BundleProductionView } from "./components/BundleProductionView";
 import { BundleDetailsDrawer } from "./components/BundleDetailsDrawer";
 import { AddBundleDialog } from "./components/AddBundleDialog";
 
@@ -11,7 +11,7 @@ export default function BundlePage() {
       <BundleHeader />
       <BundleKPIs />
       <BundleFilter />
-      <BundleTable />
+      <BundleProductionView />
       
       <BundleDetailsDrawer />
       <AddBundleDialog />

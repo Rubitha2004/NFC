@@ -35,7 +35,7 @@ export const mapBundleAPIToUI = (apiData: BundleAPI): Bundle => {
     currentWorker: apiData.currentWorker 
       ? `${apiData.currentWorker.firstName} ${apiData.currentWorker.lastName}` 
       : undefined,
-    currentMachine: apiData.currentMachine?.name,
+    currentMachine: apiData.currentMachine?.machineName,
     priority: "medium" as BundlePriority, // Fallback for now
     status: statusMap[apiData.status] || "in_progress",
     startedTime: (apiData.stageLogs && apiData.stageLogs.length > 0) ? apiData.stageLogs[apiData.stageLogs.length - 1].inTime : apiData.createdAt,

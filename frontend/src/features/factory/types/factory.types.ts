@@ -197,6 +197,9 @@ export interface Machine {
   isWorking?: boolean;
   // 3D-ready
   position: { row: 'top' | 'bottom'; index: number; x?: number; y?: number; z?: number };
+  roomId?: string;
+  rowIndex?: number;
+  positionIndex?: number;
 }
 
 // ─── Production Line ──────────────────────────────────────────────────────────

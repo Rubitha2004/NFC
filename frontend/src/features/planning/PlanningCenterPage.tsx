@@ -47,7 +47,7 @@ function LiveOperationTracker({ operationId }: { operationId: number }) {
 export default function PlanningCenterPage() {
   const { orders, isLoading: loadingOrders } = useProductionOrders();
   const { data: resources, isLoading: loadingResources } = useLivePlanningResources();
-  const { data: operations = [], isLoading: loadingOps } = useOperations();
+  const { data: operations = [], isLoading: loadingOps } = useOperations({ status: 'ACTIVE' });
   const { publishPlan } = usePlanningMutations();
   const { data: metrics, isLoading: loadingMetrics } = usePlanningDashboard();
   const { data: historyData = [], isLoading: loadingHistory } = usePlanningHistory();

@@ -160,9 +160,10 @@ function FloorSelection({ floors, onSelect }: { floors: FactoryFloorLevel[], onS
         const totalRooms = floor.rooms.length;
         const allFloorMachines = floor.rooms.flatMap(r => r.lines.flatMap(l => l.machines));
         const totalMachines = allFloorMachines.length;
+        const totalCapacity = floor.rooms.reduce((acc, r: any) => acc + ((r.rowsCount || 4) * (r.machinesPerRow || 35)), 0);
         const assignedMachines = allFloorMachines.filter(m => m.status === 'running').length;
         const idleMachines = allFloorMachines.filter(m => m.status !== 'running').length;
-        const assignedPercentage = totalMachines === 0 ? 0 : Math.round((assignedMachines / totalMachines) * 100);
+        const assignedPercentage = totalCapacity === 0 ? 0 : Math.round((assignedMachines / totalCapacity) * 100);
 
         return (
           <motion.div 
@@ -188,7 +189,7 @@ function FloorSelection({ floors, onSelect }: { floors: FactoryFloorLevel[], onS
             <div className="relative z-10 mb-6">
               <div className="flex justify-between text-xs font-semibold mb-2">
                 <span className="text-emerald-400">{assignedPercentage}% Assigned</span>
-                <span className="text-white/40">{totalMachines} Total</span>
+                <span className="text-white/40">{totalCapacity} Total Seats</span>
               </div>
               <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden shadow-inner">
                 <motion.div 
@@ -236,9 +237,10 @@ function RoomSelection({ rooms, onSelect }: { rooms: FactoryRoom[], onSelect: (i
         const totalRows = room.lines.length;
         const allRoomMachines = room.lines.flatMap(l => l.machines);
         const totalMachines = allRoomMachines.length;
+        const totalCapacity = (room as any).rowsCount * ((room as any).machinesPerRow || 35);
         const assignedMachines = allRoomMachines.filter(m => m.status === 'running').length;
         const idleMachines = allRoomMachines.filter(m => m.status !== 'running').length;
-        const assignedPercentage = totalMachines === 0 ? 0 : Math.round((assignedMachines / totalMachines) * 100);
+        const assignedPercentage = totalCapacity === 0 ? 0 : Math.round((assignedMachines / totalCapacity) * 100);
 
         return (
           <motion.div 
@@ -264,7 +266,7 @@ function RoomSelection({ rooms, onSelect }: { rooms: FactoryRoom[], onSelect: (i
             <div className="relative z-10 mb-6">
               <div className="flex justify-between text-xs font-semibold mb-2">
                 <span className="text-blue-400">{assignedPercentage}% Assigned</span>
-                <span className="text-white/40">{totalMachines} Total</span>
+                <span className="text-white/40">{totalCapacity} Total Seats</span>
               </div>
               <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden shadow-inner">
                 <motion.div 
@@ -376,9 +378,9 @@ function MachineNode({ label, number, machine, search }: { label: string, number
   const isOffline = machine?.status === 'offline' || machine?.status === 'maintenance';
   const hasWorker = !!machine?.worker;
   
-  if (!machine || (!hasWorker && !isOffline)) {
+  if (!machine) {
     return (
-      <div className="w-16 h-16 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col justify-center items-center shrink-0 shadow-inner" title={!machine ? "Seat" : "Machine Idle (Not Assigned)"}>
+      <div className="w-16 h-16 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col justify-center items-center shrink-0 shadow-inner" title="Empty Seat">
         <span className="text-xl font-bold text-white/10 mb-0.5">{label}</span>
       </div>
     );
@@ -407,6 +409,11 @@ function MachineNode({ label, number, machine, search }: { label: string, number
     dotColor = 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.8)]';
     textColor = 'text-blue-400';
     statusText = 'Assigned (Not Started)';
+  } else if (!hasWorker) {
+    statusColor = 'border-red-500/50 bg-red-500/5 shadow-[0_0_10px_rgba(239,68,68,0.1)]';
+    dotColor = 'bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
+    textColor = 'text-red-400/50';
+    statusText = 'Idle (Not Assigned)';
   }
 
   return (

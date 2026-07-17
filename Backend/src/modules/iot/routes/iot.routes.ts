@@ -5,5 +5,6 @@ const router = Router();
 const ctrl = new IotController();
 
 router.post('/scan', ctrl.handleScan.bind(ctrl));
+router.get('/demo-data/:machineId', ctrl.getDemoData.bind(ctrl));
 
 export default router;
