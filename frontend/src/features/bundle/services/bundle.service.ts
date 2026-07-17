@@ -39,7 +39,7 @@ export const mapBundleAPIToUI = (apiData: BundleAPI): Bundle => {
     priority: "medium" as BundlePriority, // Fallback for now
     status: statusMap[apiData.status] || "in_progress",
     startedTime: (apiData.stageLogs && apiData.stageLogs.length > 0) ? apiData.stageLogs[apiData.stageLogs.length - 1].inTime : apiData.createdAt,
-    completedTime: apiData.status === 'COMPLETED' ? apiData.updatedAt : (apiData.stageLogs && apiData.stageLogs.length > 0 && apiData.stageLogs[apiData.stageLogs.length - 1].outTime) ? apiData.stageLogs[apiData.stageLogs.length - 1].outTime : undefined,
+    completedTime: apiData.status === 'COMPLETED' ? apiData.updatedAt : (apiData.stageLogs && apiData.stageLogs.length > 0 && apiData.stageLogs[apiData.stageLogs.length - 1].outTime) ? (apiData.stageLogs[apiData.stageLogs.length - 1].outTime ?? undefined) : undefined,
     timeline: [],
     
     // Simulator helpers

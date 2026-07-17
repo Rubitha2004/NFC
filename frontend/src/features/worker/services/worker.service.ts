@@ -72,7 +72,7 @@ export const mapWorkerAPIToUI = (data: WorkerAPIResponse): WorkerData => {
       productionOrder: (data as any).productionTasks?.[0]?.productionOrder?.orderNumber || 'N/A',
       department: (data as any).productionTasks?.[0]?.department?.name || data.department?.name || 'General',
       status: 'active' as const,
-      assignedAt: new Date(data.assignments[0].assignedAt || new Date())
+      assignedAt: new Date((data.assignments[0] as any).assignedAt || new Date())
     } : undefined,
     joiningDate: new Date(data.createdAt),
     status: (data.status?.toLowerCase() || 'active') as WorkerStatus,

@@ -268,8 +268,8 @@ export default function PlanningCenterPage() {
     });
   }
 
-  const filteredWorkers = (resources?.workers || []).filter(w => !globallyAssignedWorkers.has(Number(w.id)));
-  const filteredMachines = (resources?.machines || []).filter(m => !globallyAssignedMachines.has(Number(m.id)));
+  const filteredWorkers = (resources?.workers || []).filter((w: any) => !globallyAssignedWorkers.has(Number(w.id)));
+  const filteredMachines = (resources?.machines || []).filter((m: any) => !globallyAssignedMachines.has(Number(m.id)));
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 text-white overflow-hidden relative">
@@ -562,7 +562,7 @@ export default function PlanningCenterPage() {
                             </div>
                             
                             {/* Phase 3.4: Live Tracker */}
-                            {selectedOrder.status === 'IN_PROGRESS' && (
+                            {selectedOrder.status === 'running' && (
                               <LiveOperationTracker operationId={opId} />
                             )}
                           </div>

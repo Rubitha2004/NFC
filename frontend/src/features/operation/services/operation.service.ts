@@ -33,8 +33,8 @@ export const mapOperationAPIToUI = (data: OperationAPIResponse): Operation => ({
 });
 
 export const operationService = {
-  async getOperations() {
-    const { data } = await apiClient.get<{ success: boolean; data: { data: OperationAPIResponse[] } }>('/operations');
+  async getOperations(params?: { status?: string, search?: string }) {
+    const { data } = await apiClient.get<{ success: boolean; data: { data: OperationAPIResponse[] } }>('/operations', { params });
     return data.data.data.map(mapOperationAPIToUI);
   },
 

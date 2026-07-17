@@ -226,6 +226,7 @@ export function BundleProductionView() {
       {/* Simulator Modal */}
       {simulatingBundle && (
         <BundleIoTSimulatorModal 
+          isOpen={true}
           bundle={simulatingBundle} 
           onClose={() => setSimulatingBundle(null)} 
         />
