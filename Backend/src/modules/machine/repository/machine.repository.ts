@@ -50,6 +50,10 @@ export class MachineRepository {
             where: { status: "ACTIVE" },
             include: { worker: true, operation: true, shift: true }
           },
+          bundles: {
+            where: { status: "IN_PROGRESS" },
+            take: 1
+          },
           productionTasks: {
             where: { status: { in: ["ASSIGNED", "RUNNING"] } },
             include: {
@@ -83,6 +87,10 @@ export class MachineRepository {
         assignments: {
           where: { status: "ACTIVE" },
           include: { worker: true, operation: true, shift: true }
+        },
+        bundles: {
+          where: { status: "IN_PROGRESS" },
+          take: 1
         },
         productionTasks: {
           where: { status: { in: ["ASSIGNED", "RUNNING"] } },

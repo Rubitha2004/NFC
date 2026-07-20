@@ -93,7 +93,7 @@ export function useFactoryData(): {
             powerStatus: 'on',
             networkStatus: 'online',
             todayTimeline: [],
-            isWorking: m.productionTasks && m.productionTasks.some((t: any) => t.status === 'RUNNING'),
+            isWorking: (m.bundles && m.bundles.length > 0),
             // Set original indices for reference, row is overridden in rendering but position matches DB
             position: { row: m.rowIndex % 2 === 0 ? 'top' : 'bottom', index: m.positionIndex != null ? m.positionIndex : index },
             roomId: m.roomId ? String(m.roomId) : undefined,
