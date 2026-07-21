@@ -56,6 +56,17 @@ export async function validateAssignmentInputBulk(tx: any, assignments: { worker
   });
   const workerSkillMap = new Set(workerSkills.map((ws: any) => `${ws.workerId}-${ws.skillId}`));
 
+  // Fetch all MachineOperationAssignment compatibility records for the machines in this plan.
+  // If a machine has ANY entries in this table, it means the table is being used to restrict
+  // which operations it can do. We only enforce the constraint when entries exist.
+  const machineOpAssignments = await tx.machineOperationAssignment.findMany({
+    where: { machineId: { in: machineIds } }
+  });
+  // Build a Set of "machineId-operationId" pairs that ARE allowed
+  const compatiblePairs = new Set(machineOpAssignments.map((r: any) => `${r.machineId}-${r.operationId}`));
+  // Track which machines have any compatibility entries at all (if none, no restriction)
+  const machinesWithRestrictions = new Set(machineOpAssignments.map((r: any) => r.machineId));
+
   const errors = [];
   for (const data of assignments) {
     const worker = workerMap.get(data.workerId);
@@ -71,6 +82,14 @@ export async function validateAssignmentInputBulk(tx: any, assignments: { worker
     if (operation && operation.requiredSkillId) {
       if (!workerSkillMap.has(`${data.workerId}-${operation.requiredSkillId}`)) {
         errors.push(`Assignment invalid for worker ${worker?.firstName} ${worker?.lastName}: missing required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`);
+      }
+    }
+
+    // Check machine-operation compatibility via MachineOperationAssignment.
+    // Only enforced if the machine has at least one compatibility entry (opt-in constraint).
+    if (machine && operation && machinesWithRestrictions.has(data.machineId)) {
+      if (!compatiblePairs.has(`${data.machineId}-${data.operationId}`)) {
+        errors.push(`Machine "${machine.machineCode}" is not listed as compatible with operation "${operation.operationName}". Update MachineOperationAssignment to allow this combination.`);
       }
     }
   }

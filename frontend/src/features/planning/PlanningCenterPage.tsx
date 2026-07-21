@@ -599,7 +599,12 @@ export default function PlanningCenterPage() {
                       min="1"
                       max={selectedOrder.targetQuantity}
                       value={piecesPerBundle}
-                      onChange={(e) => setPiecesPerBundle(parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value);
+                        if (!isNaN(raw)) {
+                          setPiecesPerBundle(Math.max(1, Math.min(raw, selectedOrder.targetQuantity)));
+                        }
+                      }}
                       className="w-full bg-zinc-950 border border-white/10 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
                     />
                   </div>
@@ -607,7 +612,7 @@ export default function PlanningCenterPage() {
                     <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-center justify-between">
                       <div>
                         <div className="text-sm text-blue-400 font-medium mb-1">Generated Bundles</div>
-                        <div className="text-2xl font-bold">{Math.ceil(selectedOrder.targetQuantity / piecesPerBundle)}</div>
+                        <div className="text-2xl font-bold">{piecesPerBundle > 0 ? Math.ceil(selectedOrder.targetQuantity / piecesPerBundle) : 0}</div>
                       </div>
                       <ArrowRight className="w-6 h-6 text-blue-500/50" />
                       <div>

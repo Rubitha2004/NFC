@@ -168,7 +168,8 @@ export class PlanningService {
     if (!task) throw new Error("Task not found");
 
     const availableMachines = await resourceAvailabilityService.getAvailableMachines({ 
-      departmentId: task.departmentId 
+      departmentId: task.departmentId,
+      operationId: task.operationId
     });
 
     const availableWorkers = await resourceAvailabilityService.getAvailableWorkers({ 

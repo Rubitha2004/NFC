@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [email, setEmail] = useState("admin@factory.com");
-  const [password, setPassword] = useState("password123");
+  const [password, setPassword] = useState("password");
   const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {

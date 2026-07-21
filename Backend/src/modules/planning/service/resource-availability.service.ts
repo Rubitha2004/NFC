@@ -21,12 +21,17 @@ export class ResourceAvailabilityService {
     });
   }
 
-  async getAvailableMachines(opts?: { departmentId?: number }) {
+  async getAvailableMachines(opts?: { departmentId?: number; operationId?: number }) {
     return prisma.machine.findMany({
       where: {
         status: "ACTIVE",
         assignments: { none: { status: "ACTIVE" } },
         ...(opts?.departmentId ? { departmentId: opts.departmentId } : {}),
+        // If an operationId is provided, only return machines listed as
+        // compatible with that operation in MachineOperationAssignment.
+        ...(opts?.operationId
+          ? { machineOperationAssignments: { some: { operationId: opts.operationId } } }
+          : {}),
       },
       include: { 
         machineType: true, 

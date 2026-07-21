@@ -268,10 +268,25 @@ async function main() {
   }
 
   // =============================================
-  // 4. BUNDLES
+  // 4. BUNDLE TAGS (seeded early so stage logs can reference them)
   // =============================================
-  console.log('Creating bundles & transactions...');
-  const bundleStatuses = ['IN_PROGRESS', 'COMPLETED', 'CREATED', 'QC_PENDING', 'WAITING'] as const;
+  console.log('Creating bundle tags...');
+  for (let i = 1; i <= 500; i++) {
+    const tagCode = `TAG-RFID-${i.toString().padStart(4, '0')}`;
+    try {
+      await prisma.bundleTagAssignment.upsert({
+        where: { tagCode },
+        update: {},
+        create: { tagCode, status: 'AVAILABLE' }
+      });
+    } catch (e) { /* skip */ }
+  }
+
+  // =============================================
+  // 5. BUNDLES
+  // =============================================
+  console.log('Creating bundles...');
+  const bundleStatuses = ['IN_PROGRESS', 'COMPLETED', 'CREATED', 'QC_COMPLETED', 'WAITING'] as const;
   const createdBundles = [];
 
   // Create 20 bundles for first 2 POs
@@ -298,32 +313,44 @@ async function main() {
   }
 
   // =============================================
-  // 5. BUNDLE TRANSACTIONS & QC
+  // 6. BUNDLE STAGE LOGS & QC
   // =============================================
-  console.log('Creating transactions & QC records...');
+  console.log('Creating stage logs & QC records...');
+
+  // Fetch a real tag to use as tagId for stage logs
+  const seedTag = await prisma.bundleTagAssignment.findFirst();
+  if (!seedTag) throw new Error('No bundle tags found — tag seeding must run before this section.');
+
   for (let i = 0; i < Math.min(createdBundles.length, 10); i++) {
     const bundle = createdBundles[i];
     const worker = workers[i % workers.length];
-    const machine = machines[i % machines.length];
-    const po = productionOrders[0];
 
     try {
-      const trx = await prisma.bundleTransaction.create({
+      // BundleStageLog tracks bundle movement through an operation stage
+      await prisma.bundleStageLog.create({
         data: {
-          bundleId: bundle.id, productionOrderId: po.id, fromOperationId: opCollar.id,
-          fromWorkerId: worker.id, fromMachineId: machine.id, quantity: 50, transactionType: 'START'
+          bundleId: bundle.id,
+          tagId: seedTag.id,
+          operationId: opCollar.id,
+          operatorId: worker.id,
+          inTime: new Date(),
         }
       });
 
-      // QC for some bundles
+      // QCCheckLog for some bundles
       if (i % 3 === 0) {
-        await prisma.qC.create({
+        await prisma.qCCheckLog.create({
           data: {
-            bundleId: bundle.id, transactionId: trx.id,
-            inspectorName: workers[8].firstName + ' ' + workers[8].lastName,
-            workerId: worker.id, machineId: machine.id,
-            passQuantity: 48, rejectQuantity: 1, reworkQuantity: 1,
-            remarks: 'Minor stitch length variation on collar seam.'
+            bundleId: bundle.id,
+            qcPersonId: workers[8].id,
+            qcTier: 'LINE_QC',
+            operationId: opCollar.id,
+            workerId: worker.id,
+            status: 'PASS',
+            passQuantity: 48,
+            rejectQuantity: 1,
+            reworkQuantity: 1,
+            defectNotes: 'Minor stitch length variation on collar seam.',
           }
         });
       }
@@ -395,23 +422,7 @@ async function main() {
     } catch (e) { /* skip */ }
   }
 
-  // =============================================
-  // 8. BUNDLE TAGS
-  // =============================================
-  console.log('Creating bundle tags...');
-  for (let i = 1; i <= 500; i++) {
-    const tagCode = `TAG-RFID-${i.toString().padStart(4, '0')}`;
-    try {
-      await prisma.bundleTagAssignment.upsert({
-        where: { tagCode },
-        update: {},
-        create: {
-          tagCode,
-          status: 'AVAILABLE'
-        }
-      });
-    } catch (e) { /* skip */ }
-  }
+  // (Bundle tags already seeded in step 4 above)
 
   console.log('✅ Comprehensive seed completed!');
   console.log('Summary:');
@@ -422,9 +433,24 @@ async function main() {
   console.log(`  - 6 Operations`);
   console.log(`  - 140 Terminals & 140 Machines`);
   console.log(`  - 10 Workers`);
+  // =============================================
+  // ADMIN USER
+  // =============================================
+  console.log('Creating admin user...');
+  const bcrypt = await import('bcryptjs');
+  const adminHash = await bcrypt.hash('password', 10);
+  await prisma.user.upsert({
+    where: { email: 'admin@factory.com' },
+    update: { password: adminHash, name: 'Admin User', role: 'ADMIN' },
+    create: { email: 'admin@factory.com', password: adminHash, name: 'Admin User', role: 'ADMIN' }
+  });
+  console.log('  ✅ admin@factory.com / password (role: ADMIN)');
+
+  console.log('\n✅ Seed complete! Created:');
   console.log(`  - 5 Production Orders (Nike, Adidas, H&M, Zara, M&S)`);
   console.log(`  - 20 Bundles with Transactions`);
   console.log(`  - QC Records, Assignments, Attendance, Planning Tasks`);
+  console.log(`  - Admin user: admin@factory.com / password`);
 }
 
 main()
