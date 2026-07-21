@@ -159,9 +159,9 @@ export default function PlanningCenterPage() {
         ...prev,
         [selectedOrderId]: {
           selectedOperations,
-          assignments,
-          piecesPerBundle
-        }
+          assignments: assignments as any,
+          piecesPerBundle: Number(piecesPerBundle) || 12
+        } as any
       }));
     }
 
@@ -305,7 +305,9 @@ export default function PlanningCenterPage() {
         // Remove from drafts
         setDrafts(prev => {
           const newDrafts = { ...prev };
-          delete newDrafts[selectedOrderId];
+          if (selectedOrderId) {
+            delete newDrafts[selectedOrderId];
+          }
           return newDrafts;
         });
 

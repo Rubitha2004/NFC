@@ -41,8 +41,8 @@ export function EventTypeBadge({ type }: { type: NFCEvent["type"] }) {
     machine_logout: { color: "text-purple-400", bg: "bg-purple-500/10", label: "Mch Logout" },
   };
   const c = config[type as keyof typeof config] || 
-    (type === 'IN' ? config.check_in : 
-     type === 'OUT' ? config.check_out : 
+    ((type as any) === 'IN' ? config.check_in : 
+     (type as any) === 'OUT' ? config.check_out : 
      { color: "text-zinc-400", bg: "bg-zinc-500/10", label: type || "Event" });
 
   return (

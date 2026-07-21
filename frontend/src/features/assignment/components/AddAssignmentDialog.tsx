@@ -44,7 +44,7 @@ export function AddAssignmentDialog() {
   const { machines } = useMachinesData();
   const { data: operations = [] } = useOperations();
   const { data: shifts = [] } = useShifts();
-  const { data: departments = [] } = useDepartments();
+  const { departments = [] } = useDepartments();
 
   const form = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentFormSchema) as any,
@@ -117,7 +117,7 @@ export function AddAssignmentDialog() {
                           </FormControl>
                           <SelectContent>
                             {workers.map(w => (
-                              <SelectItem key={w.id} value={String(w.id)}>{w.code} ({w.name})</SelectItem>
+                              <SelectItem key={w.id} value={String(w.id)}>{w.employeeCode} ({w.firstName} {w.lastName})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -140,7 +140,7 @@ export function AddAssignmentDialog() {
                           </FormControl>
                           <SelectContent>
                             {machines.map(m => (
-                              <SelectItem key={m.id} value={String(m.id)}>{m.code} ({m.name})</SelectItem>
+                              <SelectItem key={m.id} value={String(m.id)}>{m.machineId} ({m.name})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -167,8 +167,8 @@ export function AddAssignmentDialog() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {departments.map(d => (
-                              <SelectItem key={d.id} value={String(d.id)}>{d.code} - {d.name}</SelectItem>
+                            {departments.map((d: any) => (
+                              <SelectItem key={d.id} value={String(d.id)}>{d.code || d.departmentCode || d.name} - {d.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -190,7 +190,7 @@ export function AddAssignmentDialog() {
                           </FormControl>
                           <SelectContent>
                             {operations.map(o => (
-                              <SelectItem key={o.id} value={String(o.id)}>{o.operationName}</SelectItem>
+                              <SelectItem key={o.id} value={String(o.id)}>{o.name || (o as any).operationName}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
