@@ -41,6 +41,19 @@ export function useUpdateProductionOrder() {
   });
 }
 
+export function useUpdateProductionOrderStatus() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => 
+      productionOrderService.updateStatus(id, status),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['production-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['production-orders', variables.id] });
+    },
+  });
+}
+
 export function useDeleteProductionOrder() {
   const queryClient = useQueryClient();
   

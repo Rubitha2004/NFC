@@ -624,8 +624,8 @@ export default function PlanningCenterPage() {
                 <div className="flex items-center gap-3 mb-6">
                   <div className="bg-purple-500/20 text-purple-400 p-2 rounded-lg"><Clock className="w-5 h-5" /></div>
                   <div>
-                    <h2 className="text-lg font-bold">Planning & Assignment History</h2>
-                    <p className="text-xs text-white/50">Tracking logs for {selectedOrder.orderNumber}</p>
+                    <h2 className="text-lg font-bold">Shop Floor Tracking Logs</h2>
+                    <p className="text-xs text-white/50">Live terminal scans and activity for {selectedOrder.orderNumber}</p>
                   </div>
                 </div>
                 
@@ -666,9 +666,9 @@ export default function PlanningCenterPage() {
                         </div>
                       ))
                   ) : (
-                    <div className="text-center py-8 text-white/40 text-sm border border-dashed border-white/10 rounded-xl">
-                      <Clock className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                      No history found for this order. Assignments and tracking logs will appear here once published.
+                    <div className="text-center py-12 border border-white/5 border-dashed rounded-xl flex flex-col items-center gap-3 bg-zinc-950">
+                      <Clock className="w-8 h-8 text-white/10" />
+                      <p className="text-sm text-white/40 max-w-sm">No activity logged yet. Tracking logs will appear here once workers scan bundles on the shop floor.</p>
                     </div>
                   )}
                 </div>

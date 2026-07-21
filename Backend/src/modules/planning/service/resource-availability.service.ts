@@ -34,6 +34,12 @@ export class ResourceAvailabilityService {
         room: true,
         assignments: { where: { status: "ACTIVE" } }
       },
+      orderBy: [
+        { roomId: "asc" },
+        { rowIndex: "asc" },
+        { positionIndex: "asc" },
+        { id: "asc" }
+      ]
     });
   }
 }

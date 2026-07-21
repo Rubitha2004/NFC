@@ -33,6 +33,53 @@ export async function validateAssignmentInput(tx: any, data: { workerId: number,
   }
 }
 
+export async function validateAssignmentInputBulk(tx: any, assignments: { workerId: number, machineId: number, operationId: number, shiftId: number }[]) {
+  const workerIds = [...new Set(assignments.map(a => a.workerId))];
+  const machineIds = [...new Set(assignments.map(a => a.machineId))];
+  const operationIds = [...new Set(assignments.map(a => a.operationId))];
+  const shiftIds = [...new Set(assignments.map(a => a.shiftId))];
+
+  const [workers, machines, operations, shifts] = await Promise.all([
+    tx.worker.findMany({ where: { id: { in: workerIds } } }),
+    tx.machine.findMany({ where: { id: { in: machineIds } } }),
+    tx.operation.findMany({ where: { id: { in: operationIds } }, include: { requiredSkill: true } }),
+    tx.shift.findMany({ where: { id: { in: shiftIds } } })
+  ]);
+
+  const workerMap = new Map<number, any>(workers.map((w: any) => [w.id, w]));
+  const machineMap = new Map<number, any>(machines.map((m: any) => [m.id, m]));
+  const operationMap = new Map<number, any>(operations.map((o: any) => [o.id, o]));
+  const shiftMap = new Map<number, any>(shifts.map((s: any) => [s.id, s]));
+
+  const workerSkills = await tx.workerSkill.findMany({
+    where: { workerId: { in: workerIds } }
+  });
+  const workerSkillMap = new Set(workerSkills.map((ws: any) => `${ws.workerId}-${ws.skillId}`));
+
+  const errors = [];
+  for (const data of assignments) {
+    const worker = workerMap.get(data.workerId);
+    const machine = machineMap.get(data.machineId);
+    const operation = operationMap.get(data.operationId);
+    const shift = shiftMap.get(data.shiftId);
+
+    if (!worker || worker.status !== RecordStatus.ACTIVE) errors.push(`Worker (ID ${data.workerId}) not found or not active`);
+    if (!machine || machine.status !== RecordStatus.ACTIVE) errors.push(`Machine (ID ${data.machineId}) not found or not active`);
+    if (!operation || operation.status !== RecordStatus.ACTIVE) errors.push(`Operation (ID ${data.operationId}) not found or not active`);
+    if (!shift || shift.status !== RecordStatus.ACTIVE) errors.push(`Shift (ID ${data.shiftId}) not found or not active`);
+
+    if (operation && operation.requiredSkillId) {
+      if (!workerSkillMap.has(`${data.workerId}-${operation.requiredSkillId}`)) {
+        errors.push(`Assignment invalid for worker ${worker?.firstName} ${worker?.lastName}: missing required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`);
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Plan validation failed:\n${errors.join('\n')}`);
+  }
+}
+
 export class AssignmentService {
   private assignmentRepo: AssignmentRepository;
   private workerRepo: WorkerRepository;

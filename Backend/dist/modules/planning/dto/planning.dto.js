@@ -35,10 +35,14 @@ exports.PublishPlanSchema = zod_1.z.object({
         operationId: zod_1.z.number(),
         workerId: zod_1.z.number(),
         machineId: zod_1.z.number(),
-        shiftId: zod_1.z.number().optional(),
-        roomId: zod_1.z.number().optional(),
-        rowIndex: zod_1.z.number().optional(),
-        positionIndex: zod_1.z.number().optional()
+        shiftId: zod_1.z.number().nullable().optional(),
+        roomId: zod_1.z.number().nullable().optional(),
+        rowIndex: zod_1.z.number().nullable().optional(),
+        positionIndex: zod_1.z.number().nullable().optional()
     })),
-    operations: zod_1.z.array(zod_1.z.number()).optional()
+    operations: zod_1.z.array(zod_1.z.number()).optional(),
+    operationOrder: zod_1.z.array(zod_1.z.object({
+        operationId: zod_1.z.number(),
+        stepOrder: zod_1.z.number()
+    })).optional()
 });

@@ -29,7 +29,8 @@ exports.updateWorkerSchema = zod_1.z.object({
     email: zod_1.z.string().email("Invalid email").optional().or(zod_1.z.literal("")),
     dateOfBirth: zod_1.z.string().optional().transform(val => val ? new Date(val) : undefined),
     joiningDate: zod_1.z.string().optional().transform(val => val ? new Date(val) : undefined),
-    remarks: zod_1.z.string().optional()
+    remarks: zod_1.z.string().optional(),
+    status: zod_1.z.nativeEnum(client_1.RecordStatus).optional(),
 });
 exports.changeWorkerStatusSchema = zod_1.z.object({
     status: zod_1.z.enum([client_1.RecordStatus.ACTIVE, client_1.RecordStatus.INACTIVE])

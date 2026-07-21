@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useProductionOrderStore } from "../store/production-order.store";
 import { useProductionOrders } from "../hooks/useProductionOrderData";
+import { useUpdateProductionOrderStatus } from "../hooks/useProductionOrdersHooks";
 import type { ProductionOrder } from "../types/production-order.types";
 import { OrderStatusBadge, OrderPriorityBadge, ProgressBar } from "./ProductionOrderUIHelpers";
 
@@ -25,6 +26,7 @@ const columnHelper = createColumnHelper<ProductionOrder>();
 
 export function ProductionOrderTable() {
   const { orders, isLoading, isRefetching, refetch } = useProductionOrders();
+  const updateStatusMutation = useUpdateProductionOrderStatus();
   const store = useProductionOrderStore();
   const [sorting, setSorting] = useState<{ id: string; desc: boolean }[]>([]);
 
@@ -97,30 +99,42 @@ export function ProductionOrderTable() {
           <DropdownMenu>
             <DropdownMenuTrigger
               className="p-2 hover:bg-white/10 rounded-md transition-colors text-white/40 hover:text-white outline-none flex items-center justify-center"
-              onClick={(e) => e.stopPropagation()}
             >
               <MoreHorizontal className="w-4 h-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 bg-zinc-900 border-white/10 text-white">
               <DropdownMenuItem 
-                onClick={(e) => { e.stopPropagation(); store.setSelectedOrder(info.row.original.id); }}
+                onClick={() => store.setSelectedOrder(info.row.original.id)}
                 className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
               >
                 <Eye className="w-4 h-4 mr-2" /> View Details
               </DropdownMenuItem>
-              <DropdownMenuItem className="hover:bg-white/10 focus:bg-white/10 cursor-pointer">
+              <DropdownMenuItem 
+                className="hover:bg-white/10 focus:bg-white/10 cursor-pointer" 
+                onClick={() => store.setEditModalOpen(true, info.row.original.id)}
+              >
                 <FileEdit className="w-4 h-4 mr-2" /> Edit Order
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
-              <DropdownMenuItem className="hover:bg-rose-500/20 focus:bg-rose-500/20 text-rose-400 cursor-pointer">
-                <Trash2 className="w-4 h-4 mr-2" /> Cancel Order
+              <DropdownMenuItem 
+                className="hover:bg-rose-500/20 focus:bg-rose-500/20 text-rose-400 cursor-pointer" 
+                onClick={(e) => { 
+                  // Let the menu close naturally, then prompt
+                  setTimeout(() => {
+                    if(confirm("Are you sure you want to close this order?")) {
+                      updateStatusMutation.mutate({ id: info.row.original.id, status: "CLOSED" });
+                    }
+                  }, 100);
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Close Order
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       ),
     }),
-  ], [store]);
+  ], [store, updateStatusMutation]);
 
   const table = useReactTable({
     data: filteredOrders,
@@ -179,7 +193,11 @@ export function ProductionOrderTable() {
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={() => store.setSelectedOrder(row.original.id)}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('button') || target.closest('[role="menuitem"]')) return;
+                    store.setSelectedOrder(row.original.id);
+                  }}
                   className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
                 >
                   {row.getVisibleCells().map((cell) => (

@@ -16,6 +16,7 @@ exports.createMachineSchema = zod_1.z.object({
     positionIndex: zod_1.z.number().int().optional().nullable(),
 });
 exports.updateMachineSchema = zod_1.z.object({
+    machineCode: zod_1.z.string().min(1).optional(),
     machineName: zod_1.z.string().min(1).optional(),
     departmentId: zod_1.z.number().int().positive().optional(),
     machineTypeId: zod_1.z.number().int().positive().optional(),
@@ -24,6 +25,7 @@ exports.updateMachineSchema = zod_1.z.object({
     roomId: zod_1.z.number().int().optional().nullable(),
     rowIndex: zod_1.z.number().int().optional().nullable(),
     positionIndex: zod_1.z.number().int().optional().nullable(),
+    status: zod_1.z.nativeEnum(client_1.RecordStatus).optional(),
 });
 exports.changeMachineStatusSchema = zod_1.z.object({
     status: zod_1.z.nativeEnum(client_1.RecordStatus, { message: "Status is required" }),

@@ -10,6 +10,7 @@ class ResourceAvailabilityService {
         return prisma_1.default.worker.findMany({
             where: {
                 status: "ACTIVE",
+                assignments: { none: { status: "ACTIVE" } },
                 ...(opts?.departmentId ? { departmentId: opts.departmentId } : {}),
                 ...(opts?.requiredSkillId
                     ? { skills: { some: { skillId: opts.requiredSkillId } } }
@@ -28,6 +29,7 @@ class ResourceAvailabilityService {
         return prisma_1.default.machine.findMany({
             where: {
                 status: "ACTIVE",
+                assignments: { none: { status: "ACTIVE" } },
                 ...(opts?.departmentId ? { departmentId: opts.departmentId } : {}),
             },
             include: {
@@ -36,6 +38,12 @@ class ResourceAvailabilityService {
                 room: true,
                 assignments: { where: { status: "ACTIVE" } }
             },
+            orderBy: [
+                { roomId: "asc" },
+                { rowIndex: "asc" },
+                { positionIndex: "asc" },
+                { id: "asc" }
+            ]
         });
     }
 }

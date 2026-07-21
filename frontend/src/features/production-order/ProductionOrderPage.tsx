@@ -4,6 +4,7 @@ import { ProductionOrderFilter } from "./components/ProductionOrderFilter";
 import { ProductionOrderTable } from "./components/ProductionOrderTable";
 import { ProductionOrderDetailsDrawer } from "./components/ProductionOrderDetailsDrawer";
 import { AddProductionOrderDialog } from "./components/AddProductionOrderDialog";
+import { EditProductionOrderDialog } from "./components/EditProductionOrderDialog";
 
 export default function ProductionOrderPage() {
   return (
@@ -15,6 +16,7 @@ export default function ProductionOrderPage() {
       
       <ProductionOrderDetailsDrawer />
       <AddProductionOrderDialog />
+      <EditProductionOrderDialog />
     </div>
   );
 }

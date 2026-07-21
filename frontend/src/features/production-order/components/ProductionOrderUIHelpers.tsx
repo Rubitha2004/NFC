@@ -9,6 +9,7 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
     paused: { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/20", label: "Paused" },
     completed: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/20", label: "Completed" },
     delayed: { bg: "bg-rose-500/10", text: "text-rose-400", border: "border-rose-500/20", label: "Delayed" },
+    closed: { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/20", label: "Closed" },
   };
   const c = config[status as keyof typeof config] || { bg: "bg-zinc-500/10", text: "text-zinc-400", border: "border-zinc-500/20", label: status || "Unknown" };
 

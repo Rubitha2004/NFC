@@ -23,6 +23,10 @@ interface ProductionOrderStore {
   setStatusFilter: (v: string) => void;
   setPriorityFilter: (v: string) => void;
   resetFilters: () => void;
+
+  isEditModalOpen: boolean;
+  editOrderId: string | null;
+  setEditModalOpen: (open: boolean, id?: string | null) => void;
 }
 
 const FILTER_DEFAULTS = {
@@ -38,6 +42,8 @@ export const useProductionOrderStore = create<ProductionOrderStore>((set) => ({
   isDrawerOpen: false,
   drawerTab: "overview",
   isCreateModalOpen: false,
+  isEditModalOpen: false,
+  editOrderId: null,
 
   ...FILTER_DEFAULTS,
 
@@ -50,6 +56,8 @@ export const useProductionOrderStore = create<ProductionOrderStore>((set) => ({
     })),
   setDrawerTab: (tab) => set({ drawerTab: tab }),
   setCreateModalOpen: (open) => set({ isCreateModalOpen: open }),
+  
+  setEditModalOpen: (open, id = null) => set({ isEditModalOpen: open, editOrderId: id }),
 
   setSearchQuery: (q) => set({ searchQuery: q }),
   setCustomerFilter: (v) => set({ customerFilter: v }),

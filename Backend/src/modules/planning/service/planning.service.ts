@@ -2,7 +2,7 @@ import prisma from "../../../config/prisma";
 import { TaskStatus } from "@prisma/client";
 import { CreateTaskDTO, UpdateTaskDTO, PublishPlanDTO } from "../dto/planning.dto";
 import { resourceAvailabilityService } from "./resource-availability.service";
-import { validateAssignmentInput } from "../../assignment/service/assignment.service";
+import { validateAssignmentInput, validateAssignmentInputBulk } from "../../assignment/service/assignment.service";
 import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
 
 export class PlanningService {
@@ -324,23 +324,8 @@ export class PlanningService {
           assignedBy: "System Planner"
         }));
 
-        // Validate all assignments
-        const errors = [];
-        for (const a of assignmentData) {
-          try {
-            await validateAssignmentInput(tx, {
-              workerId: a.workerId,
-              machineId: a.machineId,
-              operationId: a.operationId,
-              shiftId: a.shiftId,
-            });
-          } catch (err: any) {
-            errors.push(err.message);
-          }
-        }
-        if (errors.length > 0) {
-          throw new Error(`Plan validation failed:\n${errors.join('\n')}`);
-        }
+        // Validate all assignments in bulk to prevent N+1 query performance bottleneck
+        await validateAssignmentInputBulk(tx, assignmentData);
         
         await tx.assignment.createMany({ data: assignmentData });
         // Prisma doesn't return created records for createMany in older versions, so we just add the count

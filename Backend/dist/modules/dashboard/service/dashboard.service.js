@@ -10,7 +10,7 @@ class DashboardService {
     async getOverview() {
         const data = await this.repository.getOverviewData();
         // Map Workers Summary
-        const activeWorkers = Math.min(data.activeAssignments, data.presentWorkersCount);
+        const activeWorkers = data.activeWorkersCount;
         const absentWorkers = data.totalWorkers - data.presentWorkersCount;
         const idleWorkers = data.presentWorkersCount - activeWorkers;
         const workers = {

@@ -14,8 +14,14 @@ class BundleRepository {
             include: {
                 productionOrder: true,
                 currentOperation: true,
-                currentMachine: true,
-                currentWorker: true,
+                currentMachine: { include: { department: true, terminal: true } },
+                currentWorker: { include: { department: true } },
+                stageLogs: {
+                    orderBy: { inTime: 'asc' }
+                },
+                tagAssignments: {
+                    where: { status: 'ASSIGNED' }
+                }
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -26,8 +32,14 @@ class BundleRepository {
             include: {
                 productionOrder: true,
                 currentOperation: true,
-                currentMachine: true,
-                currentWorker: true,
+                currentMachine: { include: { department: true, terminal: true } },
+                currentWorker: { include: { department: true } },
+                stageLogs: {
+                    orderBy: { inTime: 'asc' }
+                },
+                tagAssignments: {
+                    where: { status: 'ASSIGNED' }
+                }
             }
         });
     }

@@ -12,10 +12,12 @@ exports.createOperationSchema = zod_1.z.object({
     status: zod_1.z.nativeEnum(client_1.RecordStatus).optional(),
 });
 exports.updateOperationSchema = zod_1.z.object({
+    operationCode: zod_1.z.string().min(1).optional(),
     operationName: zod_1.z.string().min(1).optional(),
     description: zod_1.z.string().optional(),
     standardMinuteValue: zod_1.z.number().positive().optional(),
     displayOrder: zod_1.z.number().int().min(0).optional(),
+    status: zod_1.z.nativeEnum(client_1.RecordStatus).optional(),
 });
 exports.changeOperationStatusSchema = zod_1.z.object({
     status: zod_1.z.nativeEnum(client_1.RecordStatus, { message: "Status is required" }),
