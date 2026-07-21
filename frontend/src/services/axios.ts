@@ -1,6 +1,7 @@
 // Axios service (architecture only – no API calls yet)
 import axios from "axios";
 import { API_BASE_URL } from "@/shared/utils/constants";
+import { useAuthStore } from "@/store/auth.store";
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -13,11 +14,12 @@ const apiClient = axios.create({
 // Request interceptor – attach auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const auth = localStorage.getItem("factory-os-auth");
-    if (auth) {
-      const { state } = JSON.parse(auth);
-      if (state?.token) {
-        config.headers.set("Authorization", `Bearer ${state.token}`);
+    const token = useAuthStore.getState().token;
+    if (token) {
+      if (config.headers && typeof config.headers.set === 'function') {
+        config.headers.set("Authorization", `Bearer ${token}`);
+      } else if (config.headers) {
+        config.headers["Authorization"] = `Bearer ${token}`;
       }
     }
     return config;
