@@ -42,8 +42,7 @@ export class IotService {
         // is this the last operation in the route?
         const maxOrderTask = await tx.productionTask.findFirst({
           where: { productionOrderId: tag.bundle.productionOrderId },
-          include: { operation: true },
-          orderBy: { operation: { displayOrder: "desc" } }
+          orderBy: { sequenceOrder: "desc" }
         });
         const isFinalOperation = maxOrderTask?.operationId === operation.id;
 
