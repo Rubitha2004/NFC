@@ -14,6 +14,8 @@ interface AllocationWizardModalProps {
   initialAllocations?: { machineId: number, workerId: number, roomId?: string | number, rowIndex?: number, positionIndex?: number }[];
   allAssignments?: Record<number, { machineId: number, workerId: number, roomId?: string | number, rowIndex?: number, positionIndex?: number }[]>;
   activeOperationId?: number | null;
+  requiredSkillId?: number | null;
+  compatibleMachines?: string[];
   onSave: (allocations: { machineId: number, workerId: number, roomId: string | number, rowIndex: number, positionIndex: number }[]) => void;
 }
 
@@ -26,6 +28,8 @@ export function AllocationWizardModal({
   initialAllocations = [],
   allAssignments = {},
   activeOperationId = null,
+  requiredSkillId = null,
+  compatibleMachines = [],
   onSave,
 }: AllocationWizardModalProps) {
   const [allocations, setAllocations] = useState<{ machineId: number, workerId: number, roomId: string | number, rowIndex: number, positionIndex: number }[]>([]);
@@ -55,6 +59,32 @@ export function AllocationWizardModal({
     const matchesCategory = selectedMachineCategory === "All" || m.machineType?.name === selectedMachineCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const filteredAndSortedMachines = React.useMemo(() => {
+    return filteredMachines.map(m => {
+      const isCompatible = !compatibleMachines || compatibleMachines.length === 0 || compatibleMachines.includes(m.machineName);
+      return { ...m, isCompatible };
+    }).sort((a, b) => {
+      if (a.isCompatible && !b.isCompatible) return -1;
+      if (!a.isCompatible && b.isCompatible) return 1;
+      return 0;
+    });
+  }, [filteredMachines, compatibleMachines]);
+
+  const [workerSearchQuery, setWorkerSearchQuery] = useState("");
+
+  const filteredAndSortedWorkers = React.useMemo(() => {
+    let result = availableWorkers;
+    if (workerSearchQuery) {
+      const q = workerSearchQuery.toLowerCase();
+      result = result.filter(w => 
+        w.firstName.toLowerCase().includes(q) || 
+        w.lastName.toLowerCase().includes(q) || 
+        w.employeeCode.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [availableWorkers, workerSearchQuery]);
 
   // Initialize with the first floor/room
   useEffect(() => {
@@ -251,9 +281,9 @@ export function AllocationWizardModal({
                   
                   return (
                     <div key={rowIdx} className="w-full">
-                      <div className="relative bg-zinc-900/60 p-8 rounded-3xl border border-white/10 shadow-2xl min-w-max">
+                      <div className="relative bg-zinc-900/60 px-32 py-16 rounded-3xl border border-white/10 shadow-2xl min-w-max">
                         {/* Center Conveyor */}
-                        <div className="absolute left-8 right-8 top-1/2 h-10 bg-zinc-950 -translate-y-1/2 rounded-full border border-white/10 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
+                        <div className="absolute left-32 right-32 top-1/2 h-10 bg-zinc-950 -translate-y-1/2 rounded-full border border-white/10 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
                           <div className="w-full h-full opacity-30 animate-conveyor absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 10px, #ffffff 10px, #ffffff 12px)' }}></div>
                           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50 pointer-events-none"></div>
                           <div className="relative z-10 bg-zinc-900/90 backdrop-blur-md px-6 py-1 rounded-full border border-white/20 text-white font-bold tracking-widest shadow-xl flex items-center gap-2">
@@ -271,20 +301,22 @@ export function AllocationWizardModal({
                               const actualRoomId = selectedRoom.id.replace('room-', '');
                               const allocation = allocations.find(a => String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex);
                               
+                              const physicalMachine = allMachines.find(m => String(m.roomId) === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
+                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignment);
+
                               let isGloballyAssigned = false;
                               if (!allocation && activeOperationId) {
                                 Object.entries(allAssignments).forEach(([opId, allocs]) => {
                                   if (Number(opId) !== activeOperationId) {
-                                    if (allocs.some(a => String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex)) {
+                                    if (allocs.some(a => 
+                                      (a.roomId !== undefined && String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex) ||
+                                      (physicalMachine && a.machineId === Number(physicalMachine.id))
+                                    )) {
                                       isGloballyAssigned = true;
                                     }
                                   }
                                 });
                               }
-
-                              // Check if seat is physically occupied by a busy machine from DB
-                              const physicalMachine = allMachines.find(m => m.roomId === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
-                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignment);
                               
                               const isUnavailable = isGloballyAssigned || isPhysicallyBusy;
 
@@ -316,19 +348,22 @@ export function AllocationWizardModal({
                               const actualRoomId = selectedRoom.id.replace('room-', '');
                               const allocation = allocations.find(a => String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex);
                               
+                              const physicalMachine = allMachines.find(m => String(m.roomId) === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
+                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignment);
+
                               let isGloballyAssigned = false;
                               if (!allocation && activeOperationId) {
                                 Object.entries(allAssignments).forEach(([opId, allocs]) => {
                                   if (Number(opId) !== activeOperationId) {
-                                    if (allocs.some(a => String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex)) {
+                                    if (allocs.some(a => 
+                                      (a.roomId !== undefined && String(a.roomId) === actualRoomId && a.rowIndex === rowIdx && a.positionIndex === absoluteIndex) ||
+                                      (physicalMachine && a.machineId === Number(physicalMachine.id))
+                                    )) {
                                       isGloballyAssigned = true;
                                     }
                                   }
                                 });
                               }
-
-                              const physicalMachine = allMachines.find(m => m.roomId === actualRoomId && m.rowIndex === rowIdx && m.positionIndex === absoluteIndex);
-                              const isPhysicallyBusy = !!(physicalMachine && physicalMachine.assignment);
                               
                               const isUnavailable = isGloballyAssigned || isPhysicallyBusy;
 
@@ -453,7 +488,7 @@ export function AllocationWizardModal({
                     </div>
                     
                     <div className="grid grid-cols-2 gap-3">
-                      {filteredMachines.map(m => {
+                      {filteredAndSortedMachines.map(m => {
                       const isAllocatedLocally = allocations.some(a => a.machineId === m.id);
                       const isBusyGlobally = m.assignments && m.assignments.length > 0;
                       const isAllocated = isAllocatedLocally || isBusyGlobally;
@@ -469,7 +504,9 @@ export function AllocationWizardModal({
                               ? "border-red-500/20 bg-red-500/5 opacity-50 cursor-not-allowed"
                               : isAllocatedLocally 
                                 ? "border-white/5 bg-zinc-950/50 opacity-50 cursor-not-allowed"
-                                : "border-white/10 bg-zinc-900 hover:bg-white/5 hover:border-white/30 hover:-translate-y-0.5 shadow-lg"
+                                : m.isCompatible === false
+                                  ? "border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/50"
+                                  : "border-white/10 bg-zinc-900 hover:bg-white/5 hover:border-white/30 hover:-translate-y-0.5 shadow-lg"
                           )}
                         >
                           <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center border border-white/10 shrink-0 shadow-inner">
@@ -485,10 +522,13 @@ export function AllocationWizardModal({
                           {isBusyGlobally && (
                             <div className="text-xs font-black text-red-500/80 uppercase tracking-widest">Busy</div>
                           )}
+                          {!isAllocated && m.isCompatible === false && (
+                            <div className="text-[10px] font-bold text-amber-400 bg-amber-500/20 px-2 py-1 rounded-md max-w-[80px] text-center leading-tight">Wrong Type</div>
+                          )}
                         </button>
                       );
                     })}
-                      {filteredMachines.length === 0 && (
+                      {filteredAndSortedMachines.length === 0 && (
                         <div className="col-span-2 text-center py-12 text-white/40 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
                           No machines found matching your criteria.
                         </div>
@@ -512,8 +552,19 @@ export function AllocationWizardModal({
                        </button>
                     </div>
 
+                    <div className="mb-4 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <input
+                        type="text"
+                        placeholder="Search workers by name or code..."
+                        value={workerSearchQuery}
+                        onChange={(e) => setWorkerSearchQuery(e.target.value)}
+                        className="w-full bg-zinc-900 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/5 transition-colors"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {availableWorkers.map(w => {
+                      {filteredAndSortedWorkers.map(w => {
                         const isAllocated = allocations.some(a => a.workerId === w.id);
                         const isBusyGlobally = (w.assignments?.length || 0) > 0;
                         const isBusy = isAllocated || isBusyGlobally;
@@ -548,7 +599,7 @@ export function AllocationWizardModal({
                           </button>
                         );
                       })}
-                      {availableWorkers.length === 0 && (
+                      {filteredAndSortedWorkers.length === 0 && (
                         <div className="col-span-1 md:col-span-2 text-center py-12 text-white/40 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
                           No workers available for this operation.
                         </div>
@@ -566,9 +617,9 @@ export function AllocationWizardModal({
 }
 
 function MachineNode({ 
-  label, isSelected, isGloballyAssigned, assignedMachine, assignedWorker, physicalMachine, isPhysicallyBusy, onClick 
+  label, isSelected, isGloballyAssigned, assignedMachine, assignedWorker, physicalMachine, isPhysicallyBusy, isTopRow, onClick 
 }: { 
-  label: string, isSelected: boolean, isGloballyAssigned?: boolean, assignedMachine?: PlanningMachine, assignedWorker?: PlanningWorker, physicalMachine?: any, isPhysicallyBusy?: boolean, onClick: () => void 
+  label: string, isSelected: boolean, isGloballyAssigned?: boolean, assignedMachine?: PlanningMachine, assignedWorker?: PlanningWorker, physicalMachine?: any, isPhysicallyBusy?: boolean, isTopRow?: boolean, onClick: () => void 
 }) {
   const statusColor = isGloballyAssigned
     ? 'border-red-500/50 bg-red-500/10 opacity-80 cursor-not-allowed shadow-[0_0_15px_rgba(239,68,68,0.1)]'
@@ -615,12 +666,18 @@ function MachineNode({
       <AnimatePresence>
         {isSelected && assignedWorker && (
           <motion.div 
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-zinc-800 text-white text-[9px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-30 flex flex-col items-center border border-white/10"
+            className={cn(
+              "absolute left-1/2 -translate-x-1/2 bg-zinc-800 text-white text-[9px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-30 flex flex-col items-center border border-white/10",
+              isTopRow ? "top-full mt-2" : "bottom-full mb-2"
+            )}
           >
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-zinc-800 rotate-45 border-l border-t border-white/10" />
+            <div className={cn(
+              "absolute left-1/2 -translate-x-1/2 w-2 h-2 bg-zinc-800 rotate-45 border-white/10",
+              isTopRow ? "-top-1 border-l border-t" : "-bottom-1 border-r border-b"
+            )} />
             <span className="relative z-10 truncate max-w-[80px]">{assignedWorker.firstName}</span>
           </motion.div>
         )}

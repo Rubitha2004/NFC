@@ -30,11 +30,12 @@ export function ProductionOrderFilter() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={store.customerFilter} onValueChange={sv(store.setCustomerFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Customer" />
+          <SelectTrigger className="w-[160px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Customer:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Customers</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {CUSTOMERS.map((c) => (
               <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
@@ -42,11 +43,12 @@ export function ProductionOrderFilter() {
         </Select>
 
         <Select value={store.departmentFilter} onValueChange={sv(store.setDepartmentFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Department" />
+          <SelectTrigger className="w-[170px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Department:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {DEPARTMENTS.map((d) => (
               <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}
@@ -54,11 +56,12 @@ export function ProductionOrderFilter() {
         </Select>
 
         <Select value={store.statusFilter} onValueChange={sv(store.setStatusFilter)}>
-          <SelectTrigger className="w-[130px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Status:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="draft">Draft</SelectItem>
             <SelectItem value="planned">Planned</SelectItem>
             <SelectItem value="running">Running</SelectItem>
@@ -69,11 +72,12 @@ export function ProductionOrderFilter() {
         </Select>
 
         <Select value={store.priorityFilter} onValueChange={sv(store.setPriorityFilter)}>
-          <SelectTrigger className="w-[120px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Priority" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Priority:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Priorities</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="low">Low</SelectItem>
             <SelectItem value="medium">Medium</SelectItem>
             <SelectItem value="high">High</SelectItem>

@@ -18,6 +18,9 @@ interface MachineStore {
   statusFilter: string;
   healthFilter: string;
 
+  // Refresh
+  refreshTrigger: number;
+
   // Actions
   setSelectedMachine: (id: string | null) => void;
   setDrawerOpen: (open: boolean) => void;
@@ -34,6 +37,8 @@ interface MachineStore {
   setStatusFilter: (v: string) => void;
   setHealthFilter: (v: string) => void;
   resetFilters: () => void;
+  
+  triggerRefresh: () => void;
 }
 
 const FILTER_DEFAULTS = {
@@ -76,4 +81,7 @@ export const useMachineStore = create<MachineStore>((set) => ({
   setStatusFilter: (v) => set({ statusFilter: v }),
   setHealthFilter: (v) => set({ healthFilter: v }),
   resetFilters: () => set(FILTER_DEFAULTS),
+
+  refreshTrigger: 0,
+  triggerRefresh: () => set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
 }));

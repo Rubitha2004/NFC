@@ -25,6 +25,7 @@ import type { MachineTimelineEvent } from "../types/machine.types";
 import { DetailsDrawer } from "@/shared/components/ui/DetailsDrawer";
 import { Loader2 } from "lucide-react";
 import api from "@/services/axios";
+import { useQueryClient } from "@tanstack/react-query";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -113,30 +114,26 @@ function TimelineIcon({ type }: { type: MachineTimelineEvent["type"] }) {
 function IotDemoPanel({ machineId }: { machineId: string }) {
   const [loading, setLoading] = useState(false);
   const [log, setLog] = useState<string>("");
+  const queryClient = useQueryClient();
 
   const handleSimulate = async () => {
     setLoading(true);
-    setLog("Fetching demo mock data...");
+    setLog("Simulating IoT scan for this machine...");
     try {
-      // 1. Fetch valid mock IoT data from our new helper endpoint
-      const { data: demoRes } = await api.get(`/iot/demo-data/${machineId}`);
-      if (!demoRes.success) throw new Error(demoRes.error || "Failed to fetch demo data");
-
-      const demoData = demoRes.data;
-      setLog(`Found worker: ${demoData.workerName}\nTerminal: ${demoData.terminalCode}\nTag: ${demoData.tagCode}\nSimulating IoT Scan...`);
-
-      // 2. Trigger the actual production endpoint
-      const { data: scanRes } = await api.post("/iot/scan", {
-        tagCode: demoData.tagCode,
-        workerCardId: demoData.workerCardId,
-        terminalCode: demoData.terminalCode
-      });
+      const { data: scanRes } = await api.post(`/iot/demo-scan/${machineId}`);
 
       if (!scanRes.success) throw new Error(scanRes.error || "Scan failed");
 
-      setLog(prev => prev + `\n\nSuccess! Action: ${scanRes.data.action}\n${scanRes.data.message}`);
+      const scanData = scanRes.data;
+      setLog(
+        `Success! Action: ${scanData.action}\n${scanData.message}\n\n` +
+        `Bundle: ${scanData.bundle}\nOperation: ${scanData.operation}\nWorker: ${scanData.worker}`
+      );
+
+      // Trigger factory layout UI to refresh immediately
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
     } catch (err: any) {
-      setLog(prev => prev + `\n\nError: ${err.response?.data?.error || err.message}`);
+      setLog(`Error: ${err.response?.data?.error || err.message}`);
     } finally {
       setLoading(false);
     }

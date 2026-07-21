@@ -424,8 +424,79 @@ async function main() {
 
   // (Bundle tags already seeded in step 4 above)
 
+  // =============================================
+  // 8. TEST DATA FOR PLANNING MODULE
+  // =============================================
+  console.log('Creating test data for planning module (new floor, machines, workers)...');
+  const testDept = await prisma.department.upsert({
+    where: { code: 'DEPT-TEST' },
+    update: {},
+    create: { code: 'DEPT-TEST', name: 'Test Floor', description: 'Floor for testing planning module' }
+  });
+
+  const testTerminals = [];
+  for (let i = 141; i <= 160; i++) {
+    const t = await prisma.terminal.upsert({
+      where: { terminalCode: `TERM-${i.toString().padStart(3,'0')}` },
+      update: {},
+      create: {
+        terminalCode: `TERM-${i.toString().padStart(3,'0')}`,
+        terminalName: `Test Terminal ${i}`,
+        ipAddress: `192.168.10.${100 + i}`,
+        macAddress: `AA:BB:CC:DD:EE:${(i % 99).toString().padStart(2,'0')}`,
+        lastHeartbeat: new Date()
+      }
+    });
+    testTerminals.push(t);
+  }
+
+  const testMachines = [];
+  for (let i = 141; i <= 160; i++) {
+    const code = `MCH-${i.toString().padStart(3,'0')}`;
+    const name = `Test Machine - ${i}`;
+    const machine = await prisma.machine.upsert({
+      where: { machineCode: code },
+      update: {},
+      create: { 
+          machineCode: code, 
+          machineName: name, 
+          departmentId: testDept.id, 
+          machineTypeId: mtJuki.id, 
+          terminalId: testTerminals[i-141].id 
+      }
+    });
+    testMachines.push(machine);
+  }
+
+  const testWorkers = [];
+  for (let i = 101; i <= 120; i++) {
+    const worker = await prisma.worker.upsert({
+      where: { employeeCode: `EMP-T${i}` },
+      update: {},
+      create: {
+        employeeCode: `EMP-T${i}`, nfcCardId: `NFC-T${i}`, firstName: `TestWorker${i}`, lastName: `Planning`, gender: 'M',
+        departmentId: testDept.id, gradeId: gradeA.id,
+        joiningDate: new Date()
+      }
+    });
+    testWorkers.push(worker);
+    
+    // Add all skills so they can be tested across any operation
+    await prisma.workerSkill.upsert({
+      where: { workerId_skillId: { workerId: worker.id, skillId: skillCollar.id } },
+      update: {}, create: { workerId: worker.id, skillId: skillCollar.id }
+    });
+    await prisma.workerSkill.upsert({
+      where: { workerId_skillId: { workerId: worker.id, skillId: skillSleeve.id } },
+      update: {}, create: { workerId: worker.id, skillId: skillSleeve.id }
+    });
+    await prisma.workerSkill.upsert({
+      where: { workerId_skillId: { workerId: worker.id, skillId: skillOverlock.id } },
+      update: {}, create: { workerId: worker.id, skillId: skillOverlock.id }
+    });
+  }
+
   console.log('✅ Comprehensive seed completed!');
-  console.log('Summary:');
   console.log(`  - 4 Departments`);
   console.log(`  - 4 Machine Types`);
   console.log(`  - 2 Shifts`);

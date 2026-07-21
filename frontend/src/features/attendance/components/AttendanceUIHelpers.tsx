@@ -17,7 +17,7 @@ export function AttendanceStatusBadge({ status, isLate }: { status: AttendanceSt
     on_leave: { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/20", label: "On Leave" },
     half_day: { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/20", label: "Half Day" },
   };
-  const c = config[status];
+  const c = config[status as keyof typeof config] || { bg: "bg-zinc-500/10", text: "text-zinc-400", border: "border-zinc-500/20", label: status || "Unknown" };
 
   return (
     <span
@@ -40,7 +40,10 @@ export function EventTypeBadge({ type }: { type: NFCEvent["type"] }) {
     machine_login: { color: "text-blue-400", bg: "bg-blue-500/10", label: "Mch Login" },
     machine_logout: { color: "text-purple-400", bg: "bg-purple-500/10", label: "Mch Logout" },
   };
-  const c = config[type];
+  const c = config[type as keyof typeof config] || 
+    (type === 'IN' ? config.check_in : 
+     type === 'OUT' ? config.check_out : 
+     { color: "text-zinc-400", bg: "bg-zinc-500/10", label: type || "Event" });
 
   return (
     <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider", c.bg, c.color)}>

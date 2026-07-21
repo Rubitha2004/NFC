@@ -31,4 +31,15 @@ export class IotController {
       return res.status(400).json({ success: false, error: e.message });
     }
   }
+
+  async simulateDemoScan(req: Request, res: Response): Promise<any> {
+    try {
+      const machineIdentifier = req.params.machineId as string;
+      if (!machineIdentifier) throw new Error("Invalid machine ID");
+      const result = await service.simulateDemoScan(machineIdentifier);
+      return res.json({ success: true, data: result });
+    } catch (e: any) {
+      return res.status(400).json({ success: false, error: e.message });
+    }
+  }
 }

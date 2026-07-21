@@ -21,16 +21,7 @@ export async function validateAssignmentInput(tx: any, data: { workerId: number,
   if (!operation || operation.status !== RecordStatus.ACTIVE) throw new Error(`Operation (ID ${data.operationId}) not found or not active`);
   if (!shift || shift.status !== RecordStatus.ACTIVE) throw new Error(`Shift (ID ${data.shiftId}) not found or not active`);
 
-  if (operation.requiredSkillId) {
-    const hasSkill = await tx.workerSkill.findUnique({
-      where: { workerId_skillId: { workerId: data.workerId, skillId: operation.requiredSkillId } }
-    });
-    if (!hasSkill) {
-      throw new Error(
-        `Assignment invalid for worker ${worker.firstName} ${worker.lastName}: missing required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`
-      );
-    }
-  }
+
 }
 
 export async function validateAssignmentInputBulk(tx: any, assignments: { workerId: number, machineId: number, operationId: number, shiftId: number }[]) {
@@ -79,11 +70,6 @@ export async function validateAssignmentInputBulk(tx: any, assignments: { worker
     if (!operation || operation.status !== RecordStatus.ACTIVE) errors.push(`Operation (ID ${data.operationId}) not found or not active`);
     if (!shift || shift.status !== RecordStatus.ACTIVE) errors.push(`Shift (ID ${data.shiftId}) not found or not active`);
 
-    if (operation && operation.requiredSkillId) {
-      if (!workerSkillMap.has(`${data.workerId}-${operation.requiredSkillId}`)) {
-        errors.push(`Assignment invalid for worker ${worker?.firstName} ${worker?.lastName}: missing required skill "${operation.requiredSkill?.name}" for operation "${operation.operationName}"`);
-      }
-    }
 
     // Check machine-operation compatibility via MachineOperationAssignment.
     // Only enforced if the machine has at least one compatibility entry (opt-in constraint).

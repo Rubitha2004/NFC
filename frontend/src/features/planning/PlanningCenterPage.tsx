@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Activity, Play, ArrowRight, Package, Layers, CheckCircle, Wand2, Users, Cpu, ShieldAlert, CheckSquare, Clock, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 import { useProductionOrders } from "../production-order/hooks/useProductionOrderData";
@@ -52,18 +52,72 @@ export default function PlanningCenterPage() {
   const { data: metrics, isLoading: loadingMetrics } = usePlanningDashboard();
   const { data: historyData = [], isLoading: loadingHistory } = usePlanningHistory();
 
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [piecesPerBundle, setPiecesPerBundle] = useState<number>(12);
-  // PHASE 2: ordered array instead of Set — preserves step sequence
-  const [selectedOperations, setSelectedOperations] = useState<number[]>([]);
-  const [assignments, setAssignments] = useState<Record<number, { machineId: number, workerId: number }[]>>({});
-  
-  // Phase 5: Cache draft data per order to prevent losing work
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem('planning_selected_order');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [drafts, setDrafts] = useState<Record<string, {
     selectedOperations: number[];
-    assignments: Record<number, { machineId: number, workerId: number }[]>;
+    assignments: Record<number, { machineId: number, workerId: number, roomId?: number | string, rowIndex?: number, positionIndex?: number }[]>;
     piecesPerBundle: number;
-  }>>({});
+  }>>(() => {
+    try {
+      const saved = localStorage.getItem('planning_drafts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [piecesPerBundle, setPiecesPerBundle] = useState<number | "">(() => {
+    try {
+      const savedOrderId = localStorage.getItem('planning_selected_order');
+      if (savedOrderId) {
+        const orderId = JSON.parse(savedOrderId);
+        const savedDrafts = localStorage.getItem('planning_drafts');
+        if (savedDrafts) {
+          const draftsObj = JSON.parse(savedDrafts);
+          if (draftsObj[orderId] && draftsObj[orderId].piecesPerBundle) return draftsObj[orderId].piecesPerBundle;
+        }
+      }
+    } catch {}
+    return 12;
+  });
+
+  const [selectedOperations, setSelectedOperations] = useState<number[]>(() => {
+    try {
+      const savedOrderId = localStorage.getItem('planning_selected_order');
+      if (savedOrderId) {
+        const orderId = JSON.parse(savedOrderId);
+        const savedDrafts = localStorage.getItem('planning_drafts');
+        if (savedDrafts) {
+          const draftsObj = JSON.parse(savedDrafts);
+          if (draftsObj[orderId]) return draftsObj[orderId].selectedOperations || [];
+        }
+      }
+    } catch {}
+    return [];
+  });
+
+  const [assignments, setAssignments] = useState<Record<number, { machineId: number, workerId: number, roomId?: number | string, rowIndex?: number, positionIndex?: number }[]>>(() => {
+    try {
+      const savedOrderId = localStorage.getItem('planning_selected_order');
+      if (savedOrderId) {
+        const orderId = JSON.parse(savedOrderId);
+        const savedDrafts = localStorage.getItem('planning_drafts');
+        if (savedDrafts) {
+          const draftsObj = JSON.parse(savedDrafts);
+          if (draftsObj[orderId]) return draftsObj[orderId].assignments || {};
+        }
+      }
+    } catch {}
+    return {};
+  });
   
   // Drawer state
   const [activeOperationId, setActiveOperationId] = useState<number | null>(null);
@@ -73,6 +127,22 @@ export default function PlanningCenterPage() {
   // Tags Modal state
   const [generatedBundles, setGeneratedBundles] = useState<{ quantity: number }[] | null>(null);
   const [publishedOrderNumber, setPublishedOrderNumber] = useState<string>("");
+
+  // Sync state to localStorage whenever it changes
+  useEffect(() => {
+    const activeDrafts = { ...drafts };
+    if (selectedOrderId) {
+      activeDrafts[selectedOrderId] = {
+        selectedOperations,
+        assignments,
+        piecesPerBundle: piecesPerBundle || 12
+      };
+      localStorage.setItem('planning_selected_order', JSON.stringify(selectedOrderId));
+    } else {
+      localStorage.removeItem('planning_selected_order');
+    }
+    localStorage.setItem('planning_drafts', JSON.stringify(activeDrafts));
+  }, [selectedOrderId, selectedOperations, assignments, piecesPerBundle, drafts]);
 
   const pendingOrders = useMemo(() => {
     const targetStatus: OrderStatus = "planned";
@@ -186,11 +256,12 @@ export default function PlanningCenterPage() {
   const handlePublish = () => {
     if (!selectedOrder) return;
 
+    const bundleSize = typeof piecesPerBundle === 'number' ? piecesPerBundle : 12;
     const bundles: { quantity: number }[] = [];
     let remainingQty = selectedOrder.targetQuantity;
 
     while (remainingQty > 0) {
-      const q = Math.min(piecesPerBundle, remainingQty);
+      const q = Math.min(bundleSize, remainingQty);
       bundles.push({ quantity: q });
       remainingQty -= q;
     }
@@ -230,6 +301,14 @@ export default function PlanningCenterPage() {
       onSuccess: () => {
         setPublishedOrderNumber(selectedOrder.orderNumber);
         setGeneratedBundles(bundles);
+        
+        // Remove from drafts
+        setDrafts(prev => {
+          const newDrafts = { ...prev };
+          delete newDrafts[selectedOrderId];
+          return newDrafts;
+        });
+
         setSelectedOrderId(null);
         toast.success("Plan published and tags assigned successfully.");
       },
@@ -355,7 +434,6 @@ export default function PlanningCenterPage() {
         bundles={generatedBundles || []}
       />
 
-      {/* Allocation Wizard Modal */}
       <AllocationWizardModal 
         isOpen={activeOperationId !== null}
         onClose={() => setActiveOperationId(null)}
@@ -365,6 +443,8 @@ export default function PlanningCenterPage() {
         initialAllocations={activeOperationId ? (assignments[activeOperationId] || []) : []}
         allAssignments={assignments}
         activeOperationId={activeOperationId}
+        requiredSkillId={(activeOp as any)?.requiredSkillId}
+        compatibleMachines={(activeOp as any)?.compatibleMachines}
         onSave={(allocations) => {
           if (activeOperationId) {
             setAssignments(prev => ({
@@ -600,24 +680,29 @@ export default function PlanningCenterPage() {
                       max={selectedOrder.targetQuantity}
                       value={piecesPerBundle}
                       onChange={(e) => {
-                        const raw = parseInt(e.target.value);
+                        const val = e.target.value;
+                        if (val === "") {
+                          setPiecesPerBundle("");
+                          return;
+                        }
+                        const raw = parseInt(val);
                         if (!isNaN(raw)) {
                           setPiecesPerBundle(Math.max(1, Math.min(raw, selectedOrder.targetQuantity)));
                         }
                       }}
-                      className="w-full bg-zinc-950 border border-white/10 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                      className="w-full bg-zinc-950 border border-white/10 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   <div className="flex-1">
                     <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl flex items-center justify-between">
                       <div>
                         <div className="text-sm text-blue-400 font-medium mb-1">Generated Bundles</div>
-                        <div className="text-2xl font-bold">{piecesPerBundle > 0 ? Math.ceil(selectedOrder.targetQuantity / piecesPerBundle) : 0}</div>
+                        <div className="text-2xl font-bold">{piecesPerBundle ? Math.ceil(selectedOrder.targetQuantity / (piecesPerBundle as number)) : 0}</div>
                       </div>
                       <ArrowRight className="w-6 h-6 text-blue-500/50" />
                       <div>
                         <div className="text-sm text-blue-400 font-medium mb-1">Items per Bundle</div>
-                        <div className="text-2xl font-bold">{piecesPerBundle}</div>
+                        <div className="text-2xl font-bold">{piecesPerBundle || "-"}</div>
                       </div>
                     </div>
                   </div>

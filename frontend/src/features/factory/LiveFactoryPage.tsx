@@ -325,9 +325,9 @@ function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
           </div>
         </div>
         
-        <div className="relative bg-zinc-900/60 p-8 rounded-3xl border border-white/10 shadow-2xl overflow-x-auto min-w-max">
+        <div className="relative bg-zinc-900/60 px-32 py-28 rounded-3xl border border-white/10 shadow-2xl overflow-x-auto min-w-max">
            {/* Center Table / Conveyor */}
-           <div className="absolute left-8 right-8 top-1/2 h-10 bg-zinc-950 -translate-y-1/2 rounded-full border border-white/10 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
+           <div className="absolute left-32 right-32 top-1/2 h-10 bg-zinc-950 -translate-y-1/2 rounded-full border border-white/10 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
              {/* Animated Conveyor Belt Pattern */}
              <div className="w-full h-full opacity-30 animate-conveyor absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 10px, #ffffff 10px, #ffffff 12px)' }}></div>
              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50 pointer-events-none"></div>
@@ -344,15 +344,15 @@ function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
              <div className="flex gap-4">
                {Array.from({ length: Math.ceil(machinesPerRow / 2) }, (_, slotIdx) => {
                   const absoluteIndex = slotIdx * 2; 
-                  const machine = rowMachines.find(m => m.position?.index === absoluteIndex);
-                  return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} />;
+                  const machine = rowMachines.find(m => (m.positionIndex ?? m.position?.index) === absoluteIndex);
+                  return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} isTopRow={true} />;
                })}
              </div>
              <div className="flex gap-4 pl-10">
                {Array.from({ length: Math.floor(machinesPerRow / 2) }, (_, slotIdx) => {
                   const absoluteIndex = slotIdx * 2 + 1; 
-                  const machine = rowMachines.find(m => m.position?.index === absoluteIndex);
-                  return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} />;
+                  const machine = rowMachines.find(m => (m.positionIndex ?? m.position?.index) === absoluteIndex);
+                  return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} isTopRow={false} />;
                })}
              </div>
            </div>
@@ -367,7 +367,7 @@ function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
     </div>
   );
 }
-function MachineNode({ label, number, machine, search }: { label: string, number: number, machine?: Machine, search: string }) {
+function MachineNode({ label, number, machine, search, isTopRow }: { label: string, number: number, machine?: Machine, search: string, isTopRow?: boolean }) {
   
   const isMatch = search && machine && (
     machine.machineNumber.toLowerCase().includes(search.toLowerCase()) || 
@@ -410,9 +410,9 @@ function MachineNode({ label, number, machine, search }: { label: string, number
     textColor = 'text-blue-400';
     statusText = 'Assigned (Not Started)';
   } else if (!hasWorker) {
-    statusColor = 'border-red-500/50 bg-red-500/5 shadow-[0_0_10px_rgba(239,68,68,0.1)]';
-    dotColor = 'bg-red-400 shadow-[0_0_8px_rgba(239,68,68,0.6)]';
-    textColor = 'text-red-400/50';
+    statusColor = 'border-white/10 bg-white/[0.03] shadow-[0_0_10px_rgba(255,255,255,0.02)]';
+    dotColor = 'bg-zinc-500 shadow-[0_0_8px_rgba(113,113,122,0.6)]';
+    textColor = 'text-zinc-500';
     statusText = 'Idle (Not Assigned)';
   }
 
@@ -448,7 +448,10 @@ function MachineNode({ label, number, machine, search }: { label: string, number
       </span>
       
       {/* Tooltip on hover */}
-      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-zinc-900/95 backdrop-blur-md border border-white/10 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-max z-30 shadow-2xl min-w-[200px]">
+      <div className={cn(
+        "absolute left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur-md border border-white/10 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-max z-30 shadow-2xl min-w-[200px]",
+        isTopRow ? "top-full mt-3" : "bottom-full mb-3"
+      )}>
         <div className="flex justify-between items-start mb-2 border-b border-white/10 pb-2">
           <div className="text-sm font-bold text-white">{label}</div>
           <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-full">

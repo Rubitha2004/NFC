@@ -7,6 +7,7 @@ import type {
 } from '../types/factory.types';
 import api from '@/services/axios';
 import { mapMachineAPIToUI } from '@/features/machine/services/machine.service';
+import { useMachineStore } from '@/features/machine/store/machine.store';
 
 import { socketService } from '@/services/socket';
 
@@ -20,6 +21,7 @@ export function useFactoryData(): {
 } {
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<FactoryConfig>(FACTORY_CONFIG);
+  const refreshTrigger = useMachineStore(state => state.refreshTrigger);
 
   useEffect(() => {
     let mounted = true;
@@ -195,14 +197,14 @@ export function useFactoryData(): {
       loadData();
     };
 
-    socketService.on('BUNDLE_UPDATED', handleBundleUpdated);
+    socketService.on('bundle.updated', handleBundleUpdated);
 
     return () => { 
       mounted = false; 
       clearInterval(intervalId);
-      socketService.off('BUNDLE_UPDATED', handleBundleUpdated);
+      socketService.off('bundle.updated', handleBundleUpdated);
     };
-  }, []);
+  }, [refreshTrigger]);
 
   const allMachines = useMemo<Machine[]>(() =>
     config.buildings.flatMap((b) =>

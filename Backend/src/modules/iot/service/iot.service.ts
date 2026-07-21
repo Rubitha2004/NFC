@@ -48,7 +48,12 @@ export class IotService {
 
         const updatedBundle = await tx.bundle.update({
           where: { id: tag.bundle.id },
-          data: { status: isFinalOperation ? "WAITING" : "IN_PROGRESS" }
+          data: { 
+            status: isFinalOperation ? "WAITING" : "IN_PROGRESS",
+            currentMachineId: null,
+            currentWorkerId: null,
+            currentOperationId: isFinalOperation ? null : tag.bundle.currentOperationId
+          }
         });
 
         const task = await tx.productionTask.findFirst({
@@ -146,24 +151,70 @@ export class IotService {
   }
 
   /**
+   * Simulates an IoT scan for demo purposes on a specific machine.
+   * Picks a bundle tag compatible with the machine's operation and always performs SCAN IN.
+   */
+  async simulateDemoScan(machineIdentifier: string) {
+    const context = await this.resolveDemoMachineContext(machineIdentifier);
+    const tag = await this.findDemoTagForOperation(context.assignment.operationId);
+
+    // Close any open stage log for this bundle+operation so handleScan performs SCAN IN
+    await prisma.$transaction(async (tx) => {
+      const openLog = await tx.bundleStageLog.findFirst({
+        where: {
+          bundleId: tag.bundleId!,
+          operationId: context.assignment.operationId,
+          outTime: null,
+        },
+      });
+
+      if (openLog) {
+        await tx.bundleStageLog.update({
+          where: { id: openLog.id },
+          data: { outTime: new Date() },
+        });
+        await tx.bundle.update({
+          where: { id: tag.bundleId! },
+          data: { currentMachineId: null, currentWorkerId: null },
+        });
+      }
+    });
+
+    return this.handleScan(tag.tagCode, context.workerCardId, context.terminalCode);
+  }
+
+  /**
    * Fetches valid mock data for testing IoT interactions from the frontend.
    */
   async getDemoData(machineIdentifier: string) {
+    const context = await this.resolveDemoMachineContext(machineIdentifier);
+    const tag = await this.findDemoTagForOperation(context.assignment.operationId);
+
+    return {
+      terminalCode: context.terminalCode,
+      workerCardId: context.workerCardId,
+      tagCode: tag.tagCode,
+      bundleNumber: tag.bundle?.bundleNumber,
+      workerName: context.workerName,
+    };
+  }
+
+  private async resolveDemoMachineContext(machineIdentifier: string) {
     const idNum = parseInt(machineIdentifier, 10);
     const machine = await prisma.machine.findFirst({
       where: {
         OR: [
           { machineCode: machineIdentifier },
-          ...(isNaN(idNum) ? [] : [{ id: idNum }])
-        ]
+          ...(isNaN(idNum) ? [] : [{ id: idNum }]),
+        ],
       },
       include: {
         terminal: true,
         assignments: {
-          where: { status: 'ACTIVE' },
-          include: { worker: true, operation: true }
-        }
-      }
+          where: { status: "ACTIVE" },
+          include: { worker: true, operation: true },
+        },
+      },
     });
 
     if (!machine) throw new Error("Machine not found");
@@ -171,28 +222,112 @@ export class IotService {
     if (machine.assignments.length === 0) throw new Error("No worker assigned to this machine.");
 
     const assignment = machine.assignments[0];
-    const workerCardId = assignment.worker.nfcCardId;
-    const terminalCode = machine.terminal.terminalCode;
-
-    // Find an available bundle tag
-    // We try to find one that is assigned to a bundle that hasn't completed
-    const tag = await prisma.bundleTagAssignment.findFirst({
-      where: {
-        status: 'ASSIGNED',
-        bundleId: { not: null }
-      },
-      include: { bundle: true }
-    });
-
-    if (!tag) throw new Error("No active bundle tags found to simulate a scan.");
 
     return {
-      terminalCode,
-      workerCardId,
-      tagCode: tag.tagCode,
-      bundleNumber: tag.bundle?.bundleNumber,
-      workerName: `${assignment.worker.firstName} ${assignment.worker.lastName}`
+      assignment,
+      workerCardId: assignment.worker.nfcCardId,
+      terminalCode: machine.terminal.terminalCode,
+      workerName: `${assignment.worker.firstName} ${assignment.worker.lastName}`,
     };
+  }
+
+  private async findDemoTagForOperation(operationId: number) {
+    // 1. Find all active production orders that contain this operation
+    const tasks = await prisma.productionTask.findMany({
+      where: { operationId },
+      select: { productionOrderId: true, sequenceOrder: true },
+    });
+
+    if (tasks.length === 0) {
+      throw new Error("No production task found for this operation. Cannot simulate scan.");
+    }
+
+    const poIds = tasks.map(t => t.productionOrderId);
+
+    // 2. Fetch tags only for these active production orders
+    const tags = await prisma.bundleTagAssignment.findMany({
+      where: {
+        status: "ASSIGNED",
+        bundleId: { not: null },
+        bundle: {
+          productionOrderId: { in: poIds },
+          status: { in: ["CREATED", "IN_PROGRESS", "WAITING"] },
+        },
+      },
+      include: { bundle: true },
+      take: 50, // limit to first 50 to prevent huge loop
+      orderBy: { id: "asc" },
+    });
+
+    if (tags.length === 0) {
+      throw new Error(
+        "No compatible bundle tag found for this machine's operation. Publish a plan with bundles that can scan in at this step."
+      );
+    }
+
+    const eligible: typeof tags = [];
+
+    for (const tag of tags) {
+      if (!tag.bundle) continue;
+      const gatePassed = await this.passesSequentialGate(tag.bundle.id, operationId);
+      if (!gatePassed) continue;
+      eligible.push(tag);
+    }
+
+    if (eligible.length === 0) {
+      throw new Error(
+        "Found bundles for this operation, but they have not completed the previous operations (Sequential Gating). Please scan them in previous steps first."
+      );
+    }
+
+    // Prefer an idle bundle (not on another machine, no open log at this operation)
+    for (const tag of eligible) {
+      const openLog = await prisma.bundleStageLog.findFirst({
+        where: { bundleId: tag.bundleId!, operationId, outTime: null },
+      });
+      if (!openLog && tag.bundle?.currentMachineId == null) return tag;
+    }
+
+    // Next: bundle with no open log (may be in progress elsewhere)
+    for (const tag of eligible) {
+      const openLog = await prisma.bundleStageLog.findFirst({
+        where: { bundleId: tag.bundleId!, operationId, outTime: null },
+      });
+      if (!openLog) return tag;
+    }
+
+    // Last resort: reuse a tag — simulateDemoScan will close the open log first
+    return eligible[0];
+  }
+
+  private async passesSequentialGate(bundleId: number, operationId: number) {
+    const bundle = await prisma.bundle.findUnique({ where: { id: bundleId } });
+    if (!bundle) return false;
+
+    const currentTask = await prisma.productionTask.findFirst({
+      where: { productionOrderId: bundle.productionOrderId, operationId },
+    });
+    const currentSequence = currentTask?.sequenceOrder || 0;
+
+    const prevTask = await prisma.productionTask.findFirst({
+      where: {
+        productionOrderId: bundle.productionOrderId,
+        sequenceOrder: { lt: currentSequence, gte: 1 },
+      },
+      orderBy: { sequenceOrder: "desc" },
+    });
+
+    if (!prevTask) return true;
+
+    const prevCompletedLog = await prisma.bundleStageLog.findFirst({
+      where: {
+        bundleId,
+        operationId: prevTask.operationId,
+        outTime: { not: null },
+      },
+    });
+
+    return !!prevCompletedLog;
   }
 }
 
