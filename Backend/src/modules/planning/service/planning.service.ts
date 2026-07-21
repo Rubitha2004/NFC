@@ -11,19 +11,40 @@ export class PlanningService {
     let nextId = (maxTask?.id || 0) + 1;
     const taskIds = [];
     for (let i = 0; i < count; i++) {
-      taskIds.push(`TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${(nextId + i).toString().padStart(4, '0')}`);
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const taskIdStr = `TSK-${new Date().getFullYear()}${(new Date().getMonth()+1).toString().padStart(2, '0')}-${nextId.toString().padStart(4, '0')}`;
+        const exists = await tx.productionTask.findUnique({ where: { taskId: taskIdStr } });
+        if (!exists) {
+          taskIds.push(taskIdStr);
+          nextId++;
+          break;
+        } else {
+          nextId++;
+        }
+      }
     }
+    if (taskIds.length !== count) throw new Error("Could not generate unique task IDs, please retry");
     return taskIds;
   }
 
-  private async generateUniqueBundleNumber(tx: any, orderNumber: string): Promise<string> {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const count = await tx.bundle.count({ where: { productionOrder: { orderNumber } } });
-      const bundleNumber = `${orderNumber}-B${(count + 1).toString().padStart(3, '0')}`;
-      const exists = await tx.bundle.findUnique({ where: { bundleNumber } });
-      if (!exists) return bundleNumber;
+  private async generateUniqueBundleNumbers(tx: any, orderNumber: string, count: number): Promise<string[]> {
+    let currentCount = await tx.bundle.count({ where: { productionOrder: { orderNumber } } });
+    const bundleNumbers = [];
+    for (let i = 0; i < count; i++) {
+      let found = false;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        currentCount++;
+        const bundleNumber = `${orderNumber}-B${currentCount.toString().padStart(3, '0')}`;
+        const exists = await tx.bundle.findUnique({ where: { bundleNumber } });
+        if (!exists) {
+          bundleNumbers.push(bundleNumber);
+          found = true;
+          break;
+        }
+      }
+      if (!found) throw new Error("Could not generate a unique bundle number, please retry");
     }
-    throw new Error("Could not generate a unique bundle number, please retry");
+    return bundleNumbers;
   }
   async getDashboardMetrics() {
     const totalOrders = await prisma.productionOrder.count();
@@ -219,7 +240,8 @@ export class PlanningService {
           throw new Error(`Not enough available tags in the pool. Need ${data.bundles.length}, but only have ${availableTags.length}. Please register more tags first.`);
         }
 
-        let currentBundleCount = await tx.bundle.count({ where: { productionOrderId: order.id } });
+        const bundleNumbers = await this.generateUniqueBundleNumbers(tx, order.orderNumber, data.bundles.length);
+        let bundleIdx = 0;
         
         const CHUNK_SIZE = 100;
         for (let i = 0; i < data.bundles.length; i += CHUNK_SIZE) {
@@ -228,8 +250,7 @@ export class PlanningService {
           
           const createdChunk = await (tx.bundle as any).createManyAndReturn({
             data: chunkBundles.map(b => {
-              currentBundleCount++;
-              const bundleNumber = `${order.orderNumber}-B${currentBundleCount.toString().padStart(3, '0')}`;
+              const bundleNumber = bundleNumbers[bundleIdx++];
               return {
                 bundleNumber,
                 productionOrderId: order.id,
@@ -249,10 +270,14 @@ export class PlanningService {
       }
 
       // 2. Create Assignments (Activate for IoT) with safety
-      let defaultShiftId = undefined;
-      if (data.assignments.some(a => !a.shiftId)) {
+      let defaultShiftId: number | undefined = undefined;
+      if (data.assignments && data.assignments.some(a => !a.shiftId)) {
         const activeShift = await tx.shift.findFirst({ where: { status: "ACTIVE" } });
-        if (activeShift) defaultShiftId = activeShift.id;
+        if (activeShift) {
+          defaultShiftId = activeShift.id;
+        } else {
+          throw new Error("No shift specified and no active shift found — please select a shift");
+        }
       }
 
       const createdAssignments = [];
@@ -260,11 +285,15 @@ export class PlanningService {
         const machineIds = data.assignments.map(a => a.machineId);
         const workerIds = data.assignments.map(a => a.workerId);
         
+        const machineUpdates = data.assignments.map(a => 
+           tx.assignment.updateMany({
+              where: { machineId: a.machineId, shiftId: a.shiftId || defaultShiftId!, status: 'ACTIVE' },
+              data: { status: 'COMPLETED', releasedAt: new Date() }
+           })
+        );
+
         await Promise.all([
-          tx.assignment.updateMany({
-            where: { machineId: { in: machineIds }, status: 'ACTIVE' },
-            data: { status: 'COMPLETED', releasedAt: new Date() }
-          }),
+          ...machineUpdates,
           tx.assignment.updateMany({
             where: { workerId: { in: workerIds }, status: 'ACTIVE' },
             data: { status: 'COMPLETED', releasedAt: new Date() }
@@ -281,10 +310,19 @@ export class PlanningService {
            }
            
            const seatMap = new Map();
+           const conflicts: number[] = [];
            for (const a of Array.from(machineMap.values())) {
               const seatKey = `${a.roomId}-${a.rowIndex}-${a.positionIndex}`;
-              // If multiple machines aim for the same seat, the last one wins
+              if (seatMap.has(seatKey)) {
+                conflicts.push(seatMap.get(seatKey).machineId);
+                conflicts.push(a.machineId);
+              }
               seatMap.set(seatKey, a);
+           }
+           
+           if (conflicts.length > 0) {
+             const uniqueConflicts = [...new Set(conflicts)];
+             throw new Error(`Seat conflict detected: Multiple machines assigned to the same position (Machine IDs: ${uniqueConflicts.join(', ')}).`);
            }
            
            // We only care about the latest intended location for each seat
@@ -349,8 +387,11 @@ export class PlanningService {
         const taskData = [];
         
         for (const opId of data.operations) {
+          const opOrderObj = data.operationOrder?.find(o => o.operationId === opId);
+          const seqOrder = opOrderObj ? opOrderObj.stepOrder : 0;
           const assignmentsForOp = data.assignments.filter(a => a.operationId === opId);
           const op = await tx.operation.findUnique({ where: { id: opId } });
+          const actualDeptId = op?.departmentId || deptId;
           const estimatedTime = op ? Math.ceil(order.plannedQuantity * op.standardMinuteValue) : 60;
 
           if (assignmentsForOp.length > 0) {
@@ -363,12 +404,13 @@ export class PlanningService {
                 taskId,
                 productionOrderId: order.id,
                 operationId: opId,
-                departmentId: deptId,
+                departmentId: actualDeptId,
                 machineId: assignment.machineId,
                 workerId: assignment.workerId,
-                shiftId: assignment.shiftId || defaultShiftId,
+                shiftId: assignment.shiftId || defaultShiftId!,
                 targetQuantity: splitQuantity,
                 estimatedTime: splitTime,
+                sequenceOrder: seqOrder,
                 status: "ASSIGNED" as const,
                 priority: order.priority
               });
@@ -379,9 +421,10 @@ export class PlanningService {
                 taskId,
                 productionOrderId: order.id,
                 operationId: opId,
-                departmentId: deptId,
+                departmentId: actualDeptId,
                 targetQuantity: order.plannedQuantity,
                 estimatedTime,
+                sequenceOrder: seqOrder,
                 status: "PLANNED" as const,
                 priority: order.priority
             });
@@ -393,16 +436,7 @@ export class PlanningService {
         }
       }
 
-      // 2.6 Write the step order back to the Operations for sequential gating
-      if (data.operationOrder && data.operationOrder.length > 0) {
-        const opUpdates = data.operationOrder.map(opOrder => 
-          tx.operation.update({
-            where: { id: opOrder.operationId },
-            data: { displayOrder: opOrder.stepOrder }
-          })
-        );
-        await Promise.all(opUpdates);
-      }
+      // 2.6 (Removed: displayOrder update on Operation is no longer needed since sequenceOrder is per-task)
 
       // 3. Mark Production Order as IN_PROGRESS or PLANNED
       if (order.status === "PLANNED") {
@@ -412,6 +446,26 @@ export class PlanningService {
         });
       }
 
+      // 4. Update tags inside transaction
+      if (tagUpdatesToPerform.length > 0) {
+        const CHUNK_SIZE = 100;
+        for (let i = 0; i < tagUpdatesToPerform.length; i += CHUNK_SIZE) {
+          const chunk = tagUpdatesToPerform.slice(i, i + CHUNK_SIZE);
+          await Promise.all(chunk.map(update => 
+            tx.bundleTagAssignment.update({
+              where: { id: update.tagId },
+              data: {
+                bundleId: update.bundleId,
+                status: "ASSIGNED",
+                assignedAt: new Date(),
+                releasedAt: null,
+                assignedBy: "System Planner"
+              }
+            })
+          ));
+        }
+      }
+
       return {
         success: true,
         message: "Plan published successfully to IoT terminals",
@@ -419,27 +473,13 @@ export class PlanningService {
         assignmentsCreated: createdAssignments.length,
         createdAssignments: createdAssignments
       };
-    }, { timeout: 30000, isolationLevel: 'Serializable' });
-
-    // After successful transaction, quickly perform all tag updates concurrently using pool connections
-    if (tagUpdatesToPerform.length > 0) {
-      const CHUNK_SIZE = 100;
-      for (let i = 0; i < tagUpdatesToPerform.length; i += CHUNK_SIZE) {
-        const chunk = tagUpdatesToPerform.slice(i, i + CHUNK_SIZE);
-        await Promise.all(chunk.map(update => 
-          prisma.bundleTagAssignment.update({
-            where: { id: update.tagId },
-            data: {
-              bundleId: update.bundleId,
-              status: "ASSIGNED",
-              assignedAt: new Date(),
-              releasedAt: null,
-              assignedBy: "System Planner"
-            }
-          })
-        ));
+    }, { timeout: 30000, isolationLevel: 'Serializable' })
+    .catch((error: any) => {
+      if (error.code === 'P2034') {
+        throw new Error("Transaction conflict occurred. Please retry.");
       }
-    }
+      throw error;
+    });
 
     if (result.createdAssignments && result.createdAssignments.length > 0) {
       result.createdAssignments.forEach((assignment: any) => {

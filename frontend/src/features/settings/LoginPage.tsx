@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
+import apiClient from "@/services/axios";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -11,14 +12,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [email, setEmail] = useState("admin@factory.com");
+  const [password, setPassword] = useState("password123");
+  const [error, setError] = useState("");
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulated login – no API yet
-    await new Promise((r) => setTimeout(r, 800));
-    login({ id: 1, name: "Admin User", email: "admin@factory.com", role: "admin" }, "demo-token");
-    setIsLoading(false);
-    navigate("/planning/center");
+    setError("");
+    
+    try {
+      const response = await apiClient.post("/auth/login", { email, password });
+      const { user, token } = response.data.data;
+      login(user, token);
+      navigate("/planning/center");
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -48,7 +60,8 @@ export default function LoginPage() {
           <label className="text-sm font-medium">Email</label>
           <input
             type="email"
-            defaultValue="admin@factory.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="h-10 rounded-lg border bg-muted/50 px-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
             placeholder="admin@factory.com"
           />
@@ -59,7 +72,8 @@ export default function LoginPage() {
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              defaultValue="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full h-10 rounded-lg border bg-muted/50 px-3 pr-10 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
               placeholder="••••••••"
             />
@@ -80,6 +94,8 @@ export default function LoginPage() {
           </label>
           <a href="#" className="text-primary hover:underline">Forgot password?</a>
         </div>
+
+        {error && <div className="text-sm text-red-500">{error}</div>}
 
         <Button type="submit" className="h-10 gap-2 w-full" disabled={isLoading}>
           {isLoading ? (

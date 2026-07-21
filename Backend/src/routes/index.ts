@@ -3,6 +3,7 @@ import { Router } from "express";
 import departmentRoutes from "../modules/department/routes/department.routes";
 import workerRoutes from "../modules/worker/routes/worker.routes";
 import machineRoutes from "../modules/machine/routes/machine.routes";
+import machineTypeRoutes from "../modules/machine-type/routes/machine-type.routes";
 import operationRoutes from "../modules/operation/routes/operation.routes";
 import shiftRoutes from "../modules/shift/routes/shift.routes";
 import assignmentRoutes from "../modules/assignment/routes/assignment.routes";
@@ -20,13 +21,23 @@ import tagRoutes from "../modules/tag/routes/tag.routes";
 import stageLogRoutes from "../modules/stage-log/routes/stage-log.routes";
 import qcCheckRoutes from "../modules/qc-check/routes/qc-check.routes";
 import iotRoutes from "../modules/iot/routes/iot.routes";
+import authRoutes from "../modules/auth/routes/auth.routes";
+import { requireAuth } from "../middleware/auth.middleware";
 import prisma from "../config/prisma";
 
 const router = Router();
 
+// Public routes
+router.use("/auth", authRoutes);
+router.use("/iot", iotRoutes); // Terminals might need separate auth, keeping public for now
+
+// Protected routes
+router.use(requireAuth);
+
 router.use("/departments", departmentRoutes);
 router.use("/workers", workerRoutes);
 router.use("/machines", machineRoutes);
+router.use("/machine-types", machineTypeRoutes);
 router.use("/operations", operationRoutes);
 router.use("/shifts", shiftRoutes);
 router.use("/assignments", assignmentRoutes);
@@ -43,7 +54,6 @@ router.use("/planning", planningRoutes);
 router.use("/tags", tagRoutes);
 router.use("/stage-logs", stageLogRoutes);
 router.use("/qc-checks", qcCheckRoutes);
-router.use("/iot", iotRoutes);
 
 // Lightweight skills list — no dedicated module needed yet
 const skillsRouter = Router();

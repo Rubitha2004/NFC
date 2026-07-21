@@ -76,29 +76,33 @@ export class IotService {
 
       } else {
         // SCAN IN — first enforce sequential gating
-        // Find the previous step (highest displayOrder that is less than this operation's)
-        const prevOperation = await tx.operation.findFirst({
+        // Find current task to get its sequenceOrder
+        const currentTask = await tx.productionTask.findFirst({
+          where: { productionOrderId: tag.bundle.productionOrderId, operationId: operation.id }
+        });
+        const currentSequence = currentTask?.sequenceOrder || 0;
+
+        // Find the previous step (highest sequenceOrder that is less than this task's)
+        const prevTask = await tx.productionTask.findFirst({
           where: {
-            id: { not: operation.id },
-            displayOrder: { lt: operation.displayOrder, gte: 1 },
-            productionTasks: {
-              some: { productionOrderId: tag.bundle.productionOrderId }
-            }
+            productionOrderId: tag.bundle.productionOrderId,
+            sequenceOrder: { lt: currentSequence, gte: 1 }
           },
-          orderBy: { displayOrder: 'desc' }
+          orderBy: { sequenceOrder: 'desc' },
+          include: { operation: true }
         });
 
-        if (prevOperation) {
+        if (prevTask) {
           const prevCompletedLog = await tx.bundleStageLog.findFirst({
             where: {
               bundleId: tag.bundle.id,
-              operationId: prevOperation.id,
+              operationId: prevTask.operationId,
               outTime: { not: null }
             }
           });
           if (!prevCompletedLog) {
             throw new Error(
-              `Sequential gate: This bundle hasn't finished "${prevOperation.operationName}" yet. Complete Step ${prevOperation.displayOrder} first.`
+              `Sequential gate: This bundle hasn't finished "${prevTask.operation.operationName}" yet. Complete Step ${prevTask.sequenceOrder} first.`
             );
           }
         }

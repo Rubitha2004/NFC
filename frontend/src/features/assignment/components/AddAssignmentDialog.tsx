@@ -3,6 +3,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { assignmentFormSchema, type AssignmentFormData } from "../types/assignment.types";
 import { useAssignmentStore } from "../store/assignment.store";
 import { useCreateAssignment } from "../hooks/useCreateAssignment";
+import { useWorkersData } from "../../worker/hooks/useWorkersData";
+import { useMachinesData } from "../../machine/hooks/useMachinesData";
+import { useOperations } from "../../operation/hooks/useOperations";
+import { useShifts } from "../../shift/hooks/useShifts";
+import { useDepartments } from "../../department/hooks/useDepartments";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +40,12 @@ export function AddAssignmentDialog() {
   const store = useAssignmentStore();
   const createMutation = useCreateAssignment();
 
+  const { workers } = useWorkersData();
+  const { machines } = useMachinesData();
+  const { data: operations = [] } = useOperations();
+  const { data: shifts = [] } = useShifts();
+  const { data: departments = [] } = useDepartments();
+
   const form = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentFormSchema) as any,
     defaultValues: {
@@ -56,10 +67,10 @@ export function AddAssignmentDialog() {
 
   function onSubmit(data: AssignmentFormData) {
     createMutation.mutate({
-      workerId: 1, // Mocked for ID mapping from dummy strings
-      machineId: 1,
-      operationId: 1,
-      shiftId: 1,
+      workerId: parseInt(data.workerId),
+      machineId: parseInt(data.machineId),
+      operationId: parseInt(data.operation),
+      shiftId: parseInt(data.shift),
       assignedBy: data.supervisor,
       remarks: data.remarks
     }, {
@@ -105,8 +116,9 @@ export function AddAssignmentDialog() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="EMP-001">Fatima Bibi (EMP-001)</SelectItem>
-                            <SelectItem value="EMP-002">Amina Khan (EMP-002)</SelectItem>
+                            {workers.map(w => (
+                              <SelectItem key={w.id} value={String(w.id)}>{w.code} ({w.name})</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage className="text-[10px] text-rose-400" />
@@ -127,8 +139,9 @@ export function AddAssignmentDialog() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="MCH-001">MCH-001 (Juki DDL)</SelectItem>
-                            <SelectItem value="MCH-002">MCH-002 (Brother S7100)</SelectItem>
+                            {machines.map(m => (
+                              <SelectItem key={m.id} value={String(m.id)}>{m.code} ({m.name})</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage className="text-[10px] text-rose-400" />
@@ -147,9 +160,18 @@ export function AddAssignmentDialog() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/70 text-xs">Department</FormLabel>
-                        <FormControl>
-                          <Input className="bg-zinc-900/50 border-white/10 h-10 text-white" {...field} />
-                        </FormControl>
+                        <Select onValueChange={sv(field.onChange)} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-zinc-900/50 border-white/10 h-10 text-white">
+                              <SelectValue placeholder="Select Department" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {departments.map(d => (
+                              <SelectItem key={d.id} value={String(d.id)}>{d.code} - {d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage className="text-[10px] text-rose-400" />
                       </FormItem>
                     )}
@@ -160,9 +182,18 @@ export function AddAssignmentDialog() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white/70 text-xs">Operation</FormLabel>
-                        <FormControl>
-                          <Input className="bg-zinc-900/50 border-white/10 h-10 text-white" {...field} />
-                        </FormControl>
+                        <Select onValueChange={sv(field.onChange)} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-zinc-900/50 border-white/10 h-10 text-white">
+                              <SelectValue placeholder="Select Operation" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {operations.map(o => (
+                              <SelectItem key={o.id} value={String(o.id)}>{o.operationName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage className="text-[10px] text-rose-400" />
                       </FormItem>
                     )}
@@ -180,9 +211,9 @@ export function AddAssignmentDialog() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Morning">Morning</SelectItem>
-                            <SelectItem value="Evening">Evening</SelectItem>
-                            <SelectItem value="Night">Night</SelectItem>
+                            {shifts.map(s => (
+                              <SelectItem key={s.id} value={String(s.id)}>{s.shiftName}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage className="text-[10px] text-rose-400" />
