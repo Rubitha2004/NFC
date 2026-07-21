@@ -14,6 +14,7 @@ app.use(cors({
     "https://nfc-seven-psi.vercel.app",
   ],
   credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "X-Authorization"],
 }));
 
 app.use(helmet());

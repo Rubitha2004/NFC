@@ -5,7 +5,7 @@ import fs from "fs";
 const JWT_SECRET = process.env.JWT_SECRET || "nfc_super_secret_key_2026";
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization || (req.headers['x-authorization'] as string);
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     fs.appendFileSync('auth-debug.log', `[${new Date().toISOString()}] Missing or invalid header: ${authHeader}\n`);
     return res.status(401).json({ error: "Unauthorized: Missing token" });

@@ -18,8 +18,10 @@ apiClient.interceptors.request.use(
     if (token) {
       if (config.headers && typeof config.headers.set === 'function') {
         config.headers.set("Authorization", `Bearer ${token}`);
+        config.headers.set("X-Authorization", `Bearer ${token}`);
       } else if (config.headers) {
         config.headers["Authorization"] = `Bearer ${token}`;
+        config.headers["X-Authorization"] = `Bearer ${token}`;
       }
     }
     return config;
