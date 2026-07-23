@@ -33,6 +33,12 @@ export function usePlanningMutations() {
       queryClient.invalidateQueries({ queryKey: ['planning'] });
       queryClient.invalidateQueries({ queryKey: ['production-orders'] });
       queryClient.invalidateQueries({ queryKey: ['workers'] });
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['iot-demo-context'] });
+      import('@/features/machine/store/machine.store').then(m => {
+        m.useMachineStore.getState().triggerRefresh();
+      });
     },
   });
 

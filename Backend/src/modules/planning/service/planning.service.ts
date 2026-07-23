@@ -231,14 +231,32 @@ export class PlanningService {
       // 1. Generate Bundles if requested
       const newBundles = [];
       if (data.bundles && data.bundles.length > 0) {
-        const availableTags = await tx.bundleTagAssignment.findMany({
+        let availableTags = await tx.bundleTagAssignment.findMany({
           where: { status: "AVAILABLE" },
           take: data.bundles.length,
           orderBy: { tagCode: 'asc' }
         });
         
         if (availableTags.length < data.bundles.length) {
-          throw new Error(`Not enough available tags in the pool. Need ${data.bundles.length}, but only have ${availableTags.length}. Please register more tags first.`);
+          const needed = data.bundles.length - availableTags.length;
+          const maxTag = await tx.bundleTagAssignment.findFirst({ orderBy: { id: 'desc' } });
+          let nextNum = (maxTag?.id || 0) + 1;
+          const tagsToCreate = [];
+          for (let i = 0; i < Math.max(needed, 100); i++) {
+            tagsToCreate.push({
+              tagCode: `NFC-TAG-${String(nextNum++).padStart(4, '0')}`,
+              status: "AVAILABLE" as const
+            });
+          }
+          await tx.bundleTagAssignment.createMany({
+            data: tagsToCreate,
+            skipDuplicates: true
+          });
+          availableTags = await tx.bundleTagAssignment.findMany({
+            where: { status: "AVAILABLE" },
+            take: data.bundles.length,
+            orderBy: { tagCode: 'asc' }
+          });
         }
 
         const bundleNumbers = await this.generateUniqueBundleNumbers(tx, order.orderNumber, data.bundles.length);
@@ -439,8 +457,8 @@ export class PlanningService {
 
       // 2.6 (Removed: displayOrder update on Operation is no longer needed since sequenceOrder is per-task)
 
-      // 3. Mark Production Order as IN_PROGRESS or PLANNED
-      if (order.status === "PLANNED") {
+      // 3. Mark Production Order as IN_PROGRESS
+      if (order.status !== "COMPLETED" && order.status !== "CLOSED") {
         await tx.productionOrder.update({
           where: { id: order.id },
           data: { status: "IN_PROGRESS" }
@@ -490,6 +508,10 @@ export class PlanningService {
       delete (result as any).createdAssignments;
     }
     
+    websocketService.publish(WEBSOCKET_EVENTS.MACHINE_UPDATED, {});
+    websocketService.publish(WEBSOCKET_EVENTS.DASHBOARD_REFRESH, {});
+    websocketService.publish(WEBSOCKET_EVENTS.DASHBOARD_LIVEFLOOR_UPDATED, {});
+
     return result;
   }
 

@@ -11,6 +11,7 @@ import LiveFactoryPage from "@/features/factory/LiveFactoryPage";
 // Terminals (Standalone fullscreen apps)
 import IotTerminalPage from "@/features/iot/IotTerminalPage";
 import IotDemoPage from "@/features/iot/IotDemoPage";
+import ModularIotDemoPage from "@/features/iot-demo/IotDemoPage";
 import QCTerminalPage from "@/features/qc/QCTerminalPage";
 
 // Worker
@@ -87,6 +88,7 @@ export function AppRouter() {
           <Route path="/planning/center" element={<PlanningCenterPage />} />
           <Route path="/planning/board" element={<PlanningBoardPage />} />
           <Route path="/live-factory" element={<LiveFactoryPage />} />
+          <Route path="/iot-demo" element={<ModularIotDemoPage />} />
           <Route path="/factory-layout" element={<FactoryLayoutPage />} />
           <Route path="/departments" element={<DepartmentManagement />} />
           <Route path="/workers" element={<WorkersPage />} />

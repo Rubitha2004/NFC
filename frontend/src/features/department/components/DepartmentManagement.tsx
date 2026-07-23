@@ -62,11 +62,12 @@ export function DepartmentManagement() {
         
         <div className="flex items-center gap-3 w-full md:w-auto">
           <Select value={store.statusFilter} onValueChange={(v) => store.setStatusFilter(v || 'all')}>
-            <SelectTrigger className="w-[150px] bg-zinc-950 border-white/10">
-              <SelectValue placeholder="Status" />
+            <SelectTrigger className="w-[150px] bg-zinc-950 border-white/10 text-sm">
+              <span className="text-white/40 mr-1">Status:</span>
+              <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="all">All</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
               <SelectItem value="maintenance">Maintenance</SelectItem>
@@ -74,11 +75,12 @@ export function DepartmentManagement() {
           </Select>
 
           <Select value={store.typeFilter} onValueChange={(v) => store.setTypeFilter(v || 'all')}>
-            <SelectTrigger className="w-[150px] bg-zinc-950 border-white/10">
-              <SelectValue placeholder="Type" />
+            <SelectTrigger className="w-[150px] bg-zinc-950 border-white/10 text-sm">
+              <span className="text-white/40 mr-1">Type:</span>
+              <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="all">All</SelectItem>
               <SelectItem value="Production">Production</SelectItem>
               <SelectItem value="Quality">Quality</SelectItem>
               <SelectItem value="Logistics">Logistics</SelectItem>

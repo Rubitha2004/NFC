@@ -23,6 +23,7 @@ import {
   X,
   CalendarDays,
   Kanban,
+  Zap,
   Map,
   History,
   Tag
@@ -46,6 +47,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Planning Board", icon: Kanban, path: "/planning/board" },
   { label: "Production Orders", icon: FileText, path: "/production-orders" },
   { label: "Live Factory", icon: Factory, path: "/live-factory" },
+  { label: "IoT Demo Module", icon: Zap, path: "/iot-demo" },
   { label: "Factory Layout", icon: Map, path: "/factory-layout" },
   { label: "Departments", icon: Building2, path: "/departments" },
   { label: "Workers", icon: Users, path: "/workers" },

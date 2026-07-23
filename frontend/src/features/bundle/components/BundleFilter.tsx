@@ -27,11 +27,12 @@ export function BundleFilter() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={store.poFilter} onValueChange={sv(store.setPoFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Order" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Order:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Orders</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {POS.map((po) => (
               <SelectItem key={po} value={po}>{po}</SelectItem>
             ))}
@@ -39,11 +40,12 @@ export function BundleFilter() {
         </Select>
 
         <Select value={store.operationFilter} onValueChange={sv(store.setOperationFilter)}>
-          <SelectTrigger className="w-[160px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Operation" />
+          <SelectTrigger className="w-[170px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Operation:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Operations</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {OPERATIONS.map((op) => (
               <SelectItem key={op} value={op}>{op}</SelectItem>
             ))}
@@ -51,11 +53,12 @@ export function BundleFilter() {
         </Select>
 
         <Select value={store.departmentFilter} onValueChange={sv(store.setDepartmentFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Department" />
+          <SelectTrigger className="w-[170px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Department:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {DEPARTMENTS.map((d) => (
               <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}
@@ -63,11 +66,12 @@ export function BundleFilter() {
         </Select>
 
         <Select value={store.statusFilter} onValueChange={sv(store.setStatusFilter)}>
-          <SelectTrigger className="w-[130px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Status:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="in_progress">In Progress</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>

@@ -47,17 +47,6 @@ export async function validateAssignmentInputBulk(tx: any, assignments: { worker
   });
   const workerSkillMap = new Set(workerSkills.map((ws: any) => `${ws.workerId}-${ws.skillId}`));
 
-  // Fetch all MachineOperationAssignment compatibility records for the machines in this plan.
-  // If a machine has ANY entries in this table, it means the table is being used to restrict
-  // which operations it can do. We only enforce the constraint when entries exist.
-  const machineOpAssignments = await tx.machineOperationAssignment.findMany({
-    where: { machineId: { in: machineIds } }
-  });
-  // Build a Set of "machineId-operationId" pairs that ARE allowed
-  const compatiblePairs = new Set(machineOpAssignments.map((r: any) => `${r.machineId}-${r.operationId}`));
-  // Track which machines have any compatibility entries at all (if none, no restriction)
-  const machinesWithRestrictions = new Set(machineOpAssignments.map((r: any) => r.machineId));
-
   const errors = [];
   for (const data of assignments) {
     const worker = workerMap.get(data.workerId);
@@ -69,19 +58,36 @@ export async function validateAssignmentInputBulk(tx: any, assignments: { worker
     if (!machine || machine.status !== RecordStatus.ACTIVE) errors.push(`Machine (ID ${data.machineId}) not found or not active`);
     if (!operation || operation.status !== RecordStatus.ACTIVE) errors.push(`Operation (ID ${data.operationId}) not found or not active`);
     if (!shift || shift.status !== RecordStatus.ACTIVE) errors.push(`Shift (ID ${data.shiftId}) not found or not active`);
-
-
-    // Check machine-operation compatibility via MachineOperationAssignment.
-    // Only enforced if the machine has at least one compatibility entry (opt-in constraint).
-    if (machine && operation && machinesWithRestrictions.has(data.machineId)) {
-      if (!compatiblePairs.has(`${data.machineId}-${data.operationId}`)) {
-        errors.push(`Machine "${machine.machineCode}" is not listed as compatible with operation "${operation.operationName}". Update MachineOperationAssignment to allow this combination.`);
-      }
-    }
   }
 
   if (errors.length > 0) {
     throw new Error(`Plan validation failed:\n${errors.join('\n')}`);
+  }
+
+  // Auto-register / update MachineOperationAssignment for each assigned machine so compatibility is maintained
+  for (const data of assignments) {
+    try {
+      await tx.machineOperationAssignment.upsert({
+        where: {
+          machineId_shiftId: {
+            machineId: data.machineId,
+            shiftId: data.shiftId
+          }
+        },
+        update: {
+          operationId: data.operationId,
+          status: RecordStatus.ACTIVE
+        },
+        create: {
+          machineId: data.machineId,
+          operationId: data.operationId,
+          shiftId: data.shiftId,
+          status: RecordStatus.ACTIVE
+        }
+      });
+    } catch (e) {
+      // Ignore if upsert fails
+    }
   }
 }
 

@@ -56,4 +56,13 @@ export class ProductionOrderController {
       res.status(400).json({ success: false, error: error.message });
     }
   };
+
+  delete = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const result = await this.service.delete(Number(req.params.id));
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message });
+    }
+  };
 }

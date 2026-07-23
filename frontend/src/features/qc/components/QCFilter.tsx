@@ -27,11 +27,12 @@ export function QCFilter() {
 
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={store.bundleFilter} onValueChange={sv(store.setBundleFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Bundle" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Bundle:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Bundles</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {BUNDLES.map((b) => (
               <SelectItem key={b} value={b}>{b}</SelectItem>
             ))}
@@ -39,11 +40,12 @@ export function QCFilter() {
         </Select>
 
         <Select value={store.poFilter} onValueChange={sv(store.setPoFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Order" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Order:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Orders</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {POS.map((po) => (
               <SelectItem key={po} value={po}>{po}</SelectItem>
             ))}
@@ -51,11 +53,12 @@ export function QCFilter() {
         </Select>
         
         <Select value={store.workerFilter} onValueChange={sv(store.setWorkerFilter)}>
-          <SelectTrigger className="w-[160px] bg-zinc-900/50 border-white/10 h-10 text-sm truncate">
-            <SelectValue placeholder="Worker" />
+          <SelectTrigger className="w-[170px] bg-zinc-900/50 border-white/10 h-10 text-sm truncate">
+            <span className="text-white/40 mr-1">Worker:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Workers</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {WORKERS.map((w) => (
               <SelectItem key={w} value={w}>{w}</SelectItem>
             ))}
@@ -63,11 +66,12 @@ export function QCFilter() {
         </Select>
 
         <Select value={store.machineFilter} onValueChange={sv(store.setMachineFilter)}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Machine" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Machine:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Machines</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {MACHINES.map((m) => (
               <SelectItem key={m} value={m}>{m}</SelectItem>
             ))}
@@ -75,11 +79,12 @@ export function QCFilter() {
         </Select>
 
         <Select value={store.departmentFilter} onValueChange={sv(store.setDepartmentFilter)}>
-          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
-            <SelectValue placeholder="Department" />
+          <SelectTrigger className="w-[170px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Department:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             {DEPARTMENTS.map((d) => (
               <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}

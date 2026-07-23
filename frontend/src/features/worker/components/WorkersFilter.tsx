@@ -30,11 +30,12 @@ export function WorkersFilter() {
       <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
         
         <Select value={store.departmentFilter} onValueChange={(v) => store.setDepartmentFilter(v || 'all')}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10">
-            <SelectValue placeholder="Department" />
+          <SelectTrigger className="w-[170px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Department:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Departments</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="Stitching">Stitching</SelectItem>
             <SelectItem value="Cutting">Cutting</SelectItem>
             <SelectItem value="Finishing">Finishing</SelectItem>
@@ -43,11 +44,12 @@ export function WorkersFilter() {
         </Select>
 
         <Select value={store.gradeFilter} onValueChange={(v) => store.setGradeFilter(v || 'all')}>
-          <SelectTrigger className="w-[120px] bg-zinc-900/50 border-white/10 h-10">
-            <SelectValue placeholder="Grade" />
+          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Grade:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Grades</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="A">Grade A</SelectItem>
             <SelectItem value="B">Grade B</SelectItem>
             <SelectItem value="C">Grade C</SelectItem>
@@ -56,11 +58,12 @@ export function WorkersFilter() {
         </Select>
 
         <Select value={store.statusFilter} onValueChange={(v) => store.setStatusFilter(v || 'all')}>
-          <SelectTrigger className="w-[140px] bg-zinc-900/50 border-white/10 h-10">
-            <SelectValue placeholder="Status" />
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-white/10 h-10 text-sm">
+            <span className="text-white/40 mr-1">Status:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="on_leave">On Leave</SelectItem>
             <SelectItem value="inactive">Inactive</SelectItem>

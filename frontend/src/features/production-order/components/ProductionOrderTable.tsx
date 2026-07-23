@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useProductionOrderStore } from "../store/production-order.store";
 import { useProductionOrders } from "../hooks/useProductionOrderData";
-import { useUpdateProductionOrderStatus } from "../hooks/useProductionOrdersHooks";
+import { useUpdateProductionOrderStatus, useDeleteProductionOrder } from "../hooks/useProductionOrdersHooks";
 import type { ProductionOrder } from "../types/production-order.types";
 import { OrderStatusBadge, OrderPriorityBadge, ProgressBar } from "./ProductionOrderUIHelpers";
 
@@ -27,6 +27,7 @@ const columnHelper = createColumnHelper<ProductionOrder>();
 export function ProductionOrderTable() {
   const { orders, isLoading, isRefetching, refetch } = useProductionOrders();
   const updateStatusMutation = useUpdateProductionOrderStatus();
+  const deleteOrderMutation = useDeleteProductionOrder();
   const store = useProductionOrderStore();
   const [sorting, setSorting] = useState<{ id: string; desc: boolean }[]>([]);
 
@@ -102,7 +103,7 @@ export function ProductionOrderTable() {
             >
               <MoreHorizontal className="w-4 h-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-zinc-900 border-white/10 text-white">
+            <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-white/10 text-white">
               <DropdownMenuItem 
                 onClick={() => store.setSelectedOrder(info.row.original.id)}
                 className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
@@ -117,24 +118,35 @@ export function ProductionOrderTable() {
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem 
-                className="hover:bg-rose-500/20 focus:bg-rose-500/20 text-rose-400 cursor-pointer" 
-                onClick={(e) => { 
-                  // Let the menu close naturally, then prompt
+                className="hover:bg-amber-500/20 focus:bg-amber-500/20 text-amber-400 cursor-pointer" 
+                onClick={() => { 
                   setTimeout(() => {
-                    if(confirm("Are you sure you want to close this order?")) {
+                    if(confirm(`Close Order ${info.row.original.orderNumber}?`)) {
                       updateStatusMutation.mutate({ id: info.row.original.id, status: "CLOSED" });
                     }
                   }, 100);
                 }}
               >
-                <Trash2 className="w-4 h-4 mr-2" /> Close Order
+                <RefreshCw className="w-4 h-4 mr-2" /> Close Order
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="hover:bg-rose-500/20 focus:bg-rose-500/20 text-rose-400 cursor-pointer" 
+                onClick={() => { 
+                  setTimeout(() => {
+                    if(confirm(`Are you sure you want to DELETE Order ${info.row.original.orderNumber}?\n\nThis will release all assigned workers and machines so they become available again, and archive order history.`)) {
+                      deleteOrderMutation.mutate(info.row.original.id);
+                    }
+                  }, 100);
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete Order (Release Resources)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       ),
     }),
-  ], [store, updateStatusMutation]);
+  ], [store, updateStatusMutation, deleteOrderMutation]);
 
   const table = useReactTable({
     data: filteredOrders,

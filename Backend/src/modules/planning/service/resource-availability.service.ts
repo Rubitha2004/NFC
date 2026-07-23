@@ -22,16 +22,22 @@ export class ResourceAvailabilityService {
   }
 
   async getAvailableMachines(opts?: { departmentId?: number; operationId?: number }) {
+    let machineOpFilter = {};
+    if (opts?.operationId) {
+      const hasRestrictions = await prisma.machineOperationAssignment.count({
+        where: { operationId: opts.operationId }
+      });
+      if (hasRestrictions > 0) {
+        machineOpFilter = { machineOperationAssignments: { some: { operationId: opts.operationId } } };
+      }
+    }
+
     return prisma.machine.findMany({
       where: {
         status: "ACTIVE",
         assignments: { none: { status: "ACTIVE" } },
         ...(opts?.departmentId ? { departmentId: opts.departmentId } : {}),
-        // If an operationId is provided, only return machines listed as
-        // compatible with that operation in MachineOperationAssignment.
-        ...(opts?.operationId
-          ? { machineOperationAssignments: { some: { operationId: opts.operationId } } }
-          : {}),
+        ...machineOpFilter,
       },
       include: { 
         machineType: true, 

@@ -50,17 +50,17 @@ export default function LiveFactoryPage() {
       {/* Header & Breadcrumbs */}
       <div className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-white/10 p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-2 text-sm font-medium flex-wrap">
-          <button 
+          <button
             onClick={() => { setSelectedFloorId(null); setSelectedRoomId(null); }}
             className={cn("hover:text-white transition-colors", !selectedFloorId ? "text-emerald-400 font-bold" : "text-white/50")}
           >
             Factory
           </button>
-          
+
           {selectedFloorId && (
             <>
               <ChevronRight className="w-4 h-4 text-white/20" />
-              <button 
+              <button
                 onClick={() => setSelectedRoomId(null)}
                 className={cn("hover:text-white transition-colors", selectedFloorId && !selectedRoomId ? "text-emerald-400 font-bold" : "text-white/50")}
               >
@@ -81,7 +81,7 @@ export default function LiveFactoryPage() {
 
         <div className="relative w-full md:w-72">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-          <input 
+          <input
             type="text"
             placeholder="Search floors, rooms, machines..."
             value={search}
@@ -142,7 +142,7 @@ export default function LiveFactoryPage() {
           <RoomLayout room={selectedRoom!} search={search} />
         )}
       </div>
-      
+
       {/* Machine Details Drawer */}
       <MachineDetailsDrawer />
     </div>
@@ -166,7 +166,7 @@ function FloorSelection({ floors, onSelect }: { floors: FactoryFloorLevel[], onS
         const assignedPercentage = totalCapacity === 0 ? 0 : Math.round((assignedMachines / totalCapacity) * 100);
 
         return (
-          <motion.div 
+          <motion.div
             whileHover={{ y: -5, scale: 1.02 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             key={floor.id}
@@ -192,7 +192,7 @@ function FloorSelection({ floors, onSelect }: { floors: FactoryFloorLevel[], onS
                 <span className="text-white/40">{totalCapacity} Total Seats</span>
               </div>
               <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden shadow-inner">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${assignedPercentage}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
@@ -243,7 +243,7 @@ function RoomSelection({ rooms, onSelect }: { rooms: FactoryRoom[], onSelect: (i
         const assignedPercentage = totalCapacity === 0 ? 0 : Math.round((assignedMachines / totalCapacity) * 100);
 
         return (
-          <motion.div 
+          <motion.div
             whileHover={{ y: -5, scale: 1.02 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
             key={room.id}
@@ -269,7 +269,7 @@ function RoomSelection({ rooms, onSelect }: { rooms: FactoryRoom[], onSelect: (i
                 <span className="text-white/40">{totalCapacity} Total Seats</span>
               </div>
               <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden shadow-inner">
-                <motion.div 
+                <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${assignedPercentage}%` }}
                   transition={{ duration: 1, ease: "easeOut" }}
@@ -307,14 +307,14 @@ function RoomSelection({ rooms, onSelect }: { rooms: FactoryRoom[], onSelect: (i
 
 const ROW_PREFIXES = ['A', 'B', 'C', 'D'];
 function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
-  
+
   const numRows = room.rowsCount || 4;
   const machinesPerRow = room.machinesPerRow || 35;
 
   const rows = Array.from({ length: numRows }, (_, i) => {
-    const prefix = ROW_PREFIXES[i] || `R${i+1}`;
+    const prefix = ROW_PREFIXES[i] || `R${i + 1}`;
     const lineName = `Line ${prefix}`;
-    const roomLine = room.lines.find(l => l.lineNumber === i + 1); 
+    const roomLine = room.lines.find(l => l.lineNumber === i + 1);
     const rowMachines = roomLine?.machines || [];
 
     return (
@@ -324,38 +324,38 @@ function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
             {rowMachines.length} / {machinesPerRow} Machines Active
           </div>
         </div>
-        
+
         <div className="relative bg-zinc-900/60 px-32 py-28 rounded-3xl border border-white/10 shadow-2xl overflow-x-auto min-w-max">
-           {/* Center Table / Conveyor */}
-           <div className="absolute left-32 right-32 top-1/2 h-10 bg-zinc-950 -translate-y-1/2 rounded-full border border-white/10 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
-             {/* Animated Conveyor Belt Pattern */}
-             <div className="w-full h-full opacity-30 animate-conveyor absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 10px, #ffffff 10px, #ffffff 12px)' }}></div>
-             <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50 pointer-events-none"></div>
-             
-             {/* Centered Row Name */}
-             <div className="relative z-10 bg-zinc-900/90 backdrop-blur-md px-6 py-1 rounded-full border border-white/20 text-white font-bold tracking-widest shadow-xl flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                {lineName}
-             </div>
-           </div>
-           
-           {/* Slots */}
-           <div className="relative z-10 w-full min-w-max flex flex-col gap-12 pt-2 pb-2">
-             <div className="flex gap-4">
-               {Array.from({ length: Math.ceil(machinesPerRow / 2) }, (_, slotIdx) => {
-                  const absoluteIndex = slotIdx * 2; 
-                  const machine = rowMachines.find(m => (m.positionIndex ?? m.position?.index) === absoluteIndex);
-                  return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} isTopRow={true} />;
-               })}
-             </div>
-             <div className="flex gap-4 pl-10">
-               {Array.from({ length: Math.floor(machinesPerRow / 2) }, (_, slotIdx) => {
-                  const absoluteIndex = slotIdx * 2 + 1; 
-                  const machine = rowMachines.find(m => (m.positionIndex ?? m.position?.index) === absoluteIndex);
-                  return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} isTopRow={false} />;
-               })}
-             </div>
-           </div>
+          {/* Center Table / Conveyor */}
+          <div className="absolute left-32 right-32 top-1/2 h-10 bg-zinc-950 -translate-y-1/2 rounded-full border border-white/10 shadow-[inset_0_4px_20px_rgba(0,0,0,0.5)] flex items-center justify-center overflow-hidden">
+            {/* Animated Conveyor Belt Pattern */}
+            <div className="w-full h-full opacity-30 animate-conveyor absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 10px, #ffffff 10px, #ffffff 12px)' }}></div>
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50 pointer-events-none"></div>
+
+            {/* Centered Row Name */}
+            <div className="relative z-10 bg-zinc-900/90 backdrop-blur-md px-6 py-1 rounded-full border border-white/20 text-white font-bold tracking-widest shadow-xl flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              {lineName}
+            </div>
+          </div>
+
+          {/* Slots */}
+          <div className="relative z-10 w-full min-w-max flex flex-col gap-12 pt-2 pb-2">
+            <div className="flex gap-4">
+              {Array.from({ length: Math.ceil(machinesPerRow / 2) }, (_, slotIdx) => {
+                const absoluteIndex = slotIdx * 2;
+                const machine = rowMachines.find(m => (m.positionIndex ?? m.position?.index) === absoluteIndex);
+                return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} isTopRow={true} />;
+              })}
+            </div>
+            <div className="flex gap-4 pl-10">
+              {Array.from({ length: Math.floor(machinesPerRow / 2) }, (_, slotIdx) => {
+                const absoluteIndex = slotIdx * 2 + 1;
+                const machine = rowMachines.find(m => (m.positionIndex ?? m.position?.index) === absoluteIndex);
+                return <MachineNode key={absoluteIndex} label={`${prefix}${absoluteIndex + 1}`} number={absoluteIndex + 1} machine={machine} search={search} isTopRow={false} />;
+              })}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -368,16 +368,16 @@ function RoomLayout({ room, search }: { room: FactoryRoom, search: string }) {
   );
 }
 function MachineNode({ label, number, machine, search, isTopRow }: { label: string, number: number, machine?: Machine, search: string, isTopRow?: boolean }) {
-  
+
   const isMatch = search && machine && (
-    machine.machineNumber.toLowerCase().includes(search.toLowerCase()) || 
+    machine.machineNumber.toLowerCase().includes(search.toLowerCase()) ||
     (machine.worker && machine.worker.name.toLowerCase().includes(search.toLowerCase()))
   );
 
   // Determine States based on Real Data
   const isOffline = machine?.status === 'offline' || machine?.status === 'maintenance';
   const hasWorker = !!machine?.worker;
-  
+
   if (!machine) {
     return (
       <div className="w-16 h-16 rounded-xl border-2 border-dashed border-white/10 bg-white/[0.02] flex flex-col justify-center items-center shrink-0 shadow-inner" title="Empty Seat">
@@ -417,7 +417,7 @@ function MachineNode({ label, number, machine, search, isTopRow }: { label: stri
   }
 
   return (
-    <motion.div 
+    <motion.div
       whileHover={{ y: -4, scale: 1.05 }}
       whileTap={{ y: 0, scale: 0.95 }}
       onClick={() => {
@@ -436,17 +436,17 @@ function MachineNode({ label, number, machine, search, isTopRow }: { label: stri
       {hasWorker && !isOffline && (
         <div className={cn("absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 transition-all duration-300", dotColor)} />
       )}
-      
+
       {isOffline && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
-           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </div>
       )}
 
       <span className={cn("text-xl font-black tracking-tighter relative z-10", textColor)}>
         {label}
       </span>
-      
+
       {/* Tooltip on hover */}
       <div className={cn(
         "absolute left-1/2 -translate-x-1/2 bg-zinc-900/95 backdrop-blur-md border border-white/10 rounded-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-max z-30 shadow-2xl min-w-[200px]",
@@ -455,8 +455,8 @@ function MachineNode({ label, number, machine, search, isTopRow }: { label: stri
         <div className="flex justify-between items-start mb-2 border-b border-white/10 pb-2">
           <div className="text-sm font-bold text-white">{label}</div>
           <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-full">
-              <div className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
-              <span className={cn("text-[10px] font-semibold uppercase tracking-wider", textColor)}>{statusText}</span>
+            <div className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
+            <span className={cn("text-[10px] font-semibold uppercase tracking-wider", textColor)}>{statusText}</span>
           </div>
         </div>
 
@@ -474,7 +474,7 @@ function MachineNode({ label, number, machine, search, isTopRow }: { label: stri
         )}
 
         <div className="text-xs text-white/70 flex items-center gap-2 bg-white/5 p-2 rounded border border-white/5">
-          <User className="w-4 h-4 text-white/40" /> 
+          <User className="w-4 h-4 text-white/40" />
           <span className="font-semibold">{machine.worker?.name || 'No Worker Assigned'}</span>
         </div>
       </div>

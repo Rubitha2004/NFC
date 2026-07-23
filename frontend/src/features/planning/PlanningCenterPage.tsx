@@ -144,6 +144,28 @@ export default function PlanningCenterPage() {
     localStorage.setItem('planning_drafts', JSON.stringify(activeDrafts));
   }, [selectedOrderId, selectedOperations, assignments, piecesPerBundle, drafts]);
 
+  // Auto-validate selectedOrderId against loaded orders to clear stale localStorage selections
+  useEffect(() => {
+    if (!loadingOrders) {
+      if (orders.length > 0) {
+        const exists = orders.some(o => o.id === selectedOrderId);
+        if (!exists) {
+          const firstId = orders[0].id;
+          setSelectedOrderId(firstId);
+          const draft = drafts[firstId];
+          setAssignments(draft?.assignments || {});
+          setPiecesPerBundle(draft?.piecesPerBundle || 12);
+          setSelectedOperations(draft?.selectedOperations || []);
+        }
+      } else if (selectedOrderId !== null) {
+        setSelectedOrderId(null);
+        localStorage.removeItem('planning_selected_order');
+        setAssignments({});
+        setSelectedOperations([]);
+      }
+    }
+  }, [orders, loadingOrders, selectedOrderId]);
+
   const pendingOrders = useMemo(() => {
     const targetStatus: OrderStatus = "planned";
     return orders.filter(o => o.status === targetStatus);

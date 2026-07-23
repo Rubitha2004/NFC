@@ -1,6 +1,8 @@
 import { ProductionOrderRepository } from "../repository/production-order.repository";
 import { ProductionOrderCreateInput, ProductionOrderUpdateInput } from "../types/production-order.types";
 import { OrderStatus } from "@prisma/client";
+import prisma from "../../../config/prisma";
+import { websocketService, WEBSOCKET_EVENTS } from "../../websocket";
 
 export class ProductionOrderService {
   private repository: ProductionOrderRepository;
@@ -65,5 +67,65 @@ export class ProductionOrderService {
   async changeStatus(id: number, status: OrderStatus) {
     await this.findById(id);
     return this.repository.changeStatus(id, status);
+  }
+
+  /**
+   * Delete Production Order:
+   * 1. Releases all active worker and machine assignments tied to this order.
+   * 2. Sets assigned machines to IDLE (INACTIVE).
+   * 3. Sets production order status to CANCELLED for history preservation.
+   * 4. Emits real-time WebSocket refresh events across factory floor & boards.
+   */
+  async delete(id: number) {
+    const order = await this.findById(id);
+
+    // Collect all assigned worker & machine IDs in order tasks
+    const workerIds = order.productionTasks
+      .map((t: any) => t.workerId)
+      .filter((wId: any): wId is number => Boolean(wId));
+
+    const machineIds = order.productionTasks
+      .map((t: any) => t.machineId)
+      .filter((mId: any): mId is number => Boolean(mId));
+
+    // Release active assignments
+    if (workerIds.length > 0 || machineIds.length > 0) {
+      await prisma.assignment.updateMany({
+        where: {
+          status: 'ACTIVE',
+          OR: [
+            { workerId: { in: workerIds } },
+            { machineId: { in: machineIds } },
+          ],
+        },
+        data: {
+          status: 'COMPLETED',
+          releasedAt: new Date(),
+        },
+      });
+    }
+
+    // Set assigned machines status to INACTIVE (Idle)
+    if (machineIds.length > 0) {
+      await prisma.machine.updateMany({
+        where: { id: { in: machineIds } },
+        data: { status: 'INACTIVE' },
+      });
+    }
+
+    // Update order status to CLOSED for history preservation
+    const cancelledOrder = await this.repository.changeStatus(id, OrderStatus.CLOSED);
+
+    // Broadcast WebSocket updates for instant UI synchronization
+    websocketService.publish(WEBSOCKET_EVENTS.DASHBOARD_REFRESH, {});
+    websocketService.publish(WEBSOCKET_EVENTS.MACHINE_UPDATED, {});
+    websocketService.publish(WEBSOCKET_EVENTS.ATTENDANCE_UPDATED, {});
+    websocketService.publish(WEBSOCKET_EVENTS.BUNDLE_UPDATED, {});
+
+    return {
+      success: true,
+      message: `Production Order ${order.orderNumber} deleted and assigned resources released.`,
+      order: cancelledOrder,
+    };
   }
 }

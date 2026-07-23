@@ -15,8 +15,9 @@ export function ReportsFilter() {
       <div className="flex items-center gap-2 border-r border-white/10 pr-3">
         <Calendar className="w-4 h-4 text-white/40" />
         <Select value={store.dateFilter} onValueChange={sv(store.setDateFilter)}>
-          <SelectTrigger className="w-[130px] bg-zinc-950/50 border-white/10 h-8 text-xs">
-            <SelectValue placeholder="Date Range" />
+          <SelectTrigger className="w-[150px] bg-zinc-950/50 border-white/10 h-8 text-xs">
+            <span className="text-white/40 mr-1">Date:</span>
+            <SelectValue placeholder="Range" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="today">Today</SelectItem>
@@ -31,8 +32,9 @@ export function ReportsFilter() {
       <div className="flex items-center gap-2 border-r border-white/10 pr-3">
         <LayoutGrid className="w-4 h-4 text-white/40" />
         <Select value={store.departmentFilter} onValueChange={sv(store.setDepartmentFilter)}>
-          <SelectTrigger className="w-[130px] bg-zinc-950/50 border-white/10 h-8 text-xs">
-            <SelectValue placeholder="Department" />
+          <SelectTrigger className="w-[150px] bg-zinc-950/50 border-white/10 h-8 text-xs">
+            <span className="text-white/40 mr-1">Dept:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Depts</SelectItem>
@@ -46,8 +48,9 @@ export function ReportsFilter() {
       <div className="flex items-center gap-2 border-r border-white/10 pr-3">
         <Clock className="w-4 h-4 text-white/40" />
         <Select value={store.shiftFilter} onValueChange={sv(store.setShiftFilter)}>
-          <SelectTrigger className="w-[110px] bg-zinc-950/50 border-white/10 h-8 text-xs">
-            <SelectValue placeholder="Shift" />
+          <SelectTrigger className="w-[130px] bg-zinc-950/50 border-white/10 h-8 text-xs">
+            <span className="text-white/40 mr-1">Shift:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Shifts</SelectItem>
@@ -61,8 +64,9 @@ export function ReportsFilter() {
       <div className="flex items-center gap-2 border-r border-white/10 pr-3">
         <Users className="w-4 h-4 text-white/40" />
         <Select value={store.workerFilter} onValueChange={sv(store.setWorkerFilter)}>
-          <SelectTrigger className="w-[130px] bg-zinc-950/50 border-white/10 h-8 text-xs">
-            <SelectValue placeholder="Worker" />
+          <SelectTrigger className="w-[150px] bg-zinc-950/50 border-white/10 h-8 text-xs">
+            <span className="text-white/40 mr-1">Worker:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Workers</SelectItem>
@@ -75,8 +79,9 @@ export function ReportsFilter() {
       <div className="flex items-center gap-2 border-r border-white/10 pr-3">
         <Settings className="w-4 h-4 text-white/40" />
         <Select value={store.machineFilter} onValueChange={sv(store.setMachineFilter)}>
-          <SelectTrigger className="w-[130px] bg-zinc-950/50 border-white/10 h-8 text-xs">
-            <SelectValue placeholder="Machine" />
+          <SelectTrigger className="w-[150px] bg-zinc-950/50 border-white/10 h-8 text-xs">
+            <span className="text-white/40 mr-1">Machine:</span>
+            <SelectValue placeholder="All" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Machines</SelectItem>

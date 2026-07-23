@@ -61,6 +61,10 @@ export function useDeleteProductionOrder() {
     mutationFn: (id: string) => productionOrderService.deleteProductionOrder(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['production-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['machines'] });
+      queryClient.invalidateQueries({ queryKey: ['attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['planning'] });
+      queryClient.invalidateQueries({ queryKey: ['iot-demo-context'] });
     },
   });
 }

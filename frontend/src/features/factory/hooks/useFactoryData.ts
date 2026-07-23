@@ -3,12 +3,11 @@ import { FACTORY_CONFIG } from '../data/factory.mock';
 import type {
   FactoryConfig, FactoryStats, Machine, MachineStatus,
   MachineContext,
-  FactoryBuilding, FactoryFloorLevel, FactoryRoom, ProductionLine, RoomType
+  FactoryBuilding, FactoryFloorLevel, FactoryRoom, ProductionLine
 } from '../types/factory.types';
 import api from '@/services/axios';
 import { mapMachineAPIToUI } from '@/features/machine/services/machine.service';
 import { useMachineStore } from '@/features/machine/store/machine.store';
-
 import { socketService } from '@/services/socket';
 
 export function useFactoryData(): {
@@ -28,60 +27,104 @@ export function useFactoryData(): {
 
     async function loadData() {
       try {
-        const [machinesRes, floorsRes] = await Promise.all([
-          api.get('/machines?limit=2000'), // increased limit to support 420+ machines
-          api.get('/floors') // get actual layout hierarchy
+        const [machinesRes, floorsRes, attendanceRes] = await Promise.all([
+          api.get('/machines?limit=2000'),
+          api.get('/floors'),
+          api.get('/attendance/today').catch(() => ({ data: { data: [] } })),
         ]);
 
         if (!mounted) return;
 
         const rawMachines = machinesRes.data.data?.data || machinesRes.data.data || [];
         const rawFloors = floorsRes.data.data || [];
+        const rawAttendances = attendanceRes.data?.data || [];
+
+        // Build latest attendance map per workerId
+        const latestAttendanceMap = new Map<number, any>();
+        rawAttendances.forEach((att: any) => {
+          const existing = latestAttendanceMap.get(att.workerId);
+          if (!existing || new Date(att.tapTime) > new Date(existing.tapTime)) {
+            latestAttendanceMap.set(att.workerId, att);
+          }
+        });
 
         const mappedMachines = rawMachines.map((m: any, index: number) => {
           const uiMachine = mapMachineAPIToUI(m);
-          
+
           let worker: any = null;
           let assignment: any = null;
-          
-          if (m.assignments && m.assignments.length > 0) {
-            const activeAssignment = m.assignments[0];
-            if (activeAssignment.worker) {
-               worker = {
-                 id: activeAssignment.worker.id.toString(),
-                 name: `${activeAssignment.worker.firstName} ${activeAssignment.worker.lastName}`,
-                 photo: undefined,
-                 role: 'Worker',
-                 department: uiMachine.department || 'General',
-                 employeeId: activeAssignment.worker.employeeCode,
-                 shiftId: activeAssignment.shiftId?.toString() || '1',
-                 grade: 'A',
-                 attendanceToday: 'present',
-                 checkInTime: new Date().toISOString()
-               };
+          let attendanceState: 'present' | 'checked_out' | 'assigned_not_present' = 'assigned_not_present';
+          let checkInTimeStr: string | undefined = undefined;
+          let checkOutTimeStr: string | undefined = undefined;
+
+          // Resolve assigned worker from Assignment OR ProductionTask
+          const activeAssignment = m.assignments && m.assignments.length > 0 ? m.assignments[0] : null;
+          const activeTask = m.productionTasks && m.productionTasks.length > 0 ? m.productionTasks[0] : null;
+
+          const assignedWorkerData = activeAssignment?.worker || activeTask?.worker;
+
+          if (assignedWorkerData) {
+            const latestAtt = latestAttendanceMap.get(assignedWorkerData.id);
+            if (latestAtt?.attendanceType === 'IN') {
+              attendanceState = 'present';
+              checkInTimeStr = latestAtt.tapTime;
+            } else if (latestAtt?.attendanceType === 'OUT') {
+              attendanceState = 'checked_out';
+              checkOutTimeStr = latestAtt.tapTime;
+            } else {
+              attendanceState = 'assigned_not_present';
             }
-            const activeTask = m.productionTasks?.[0];
+
+            worker = {
+              id: assignedWorkerData.id.toString(),
+              name: `${assignedWorkerData.firstName || ''} ${assignedWorkerData.lastName || ''}`.trim() || assignedWorkerData.employeeCode,
+              role: 'Worker',
+              department: uiMachine.department || 'General',
+              employeeId: assignedWorkerData.employeeCode,
+              shiftId: activeAssignment?.shiftId?.toString() || '1',
+              grade: 'A',
+              attendanceToday: attendanceState,
+              checkInTime: checkInTimeStr,
+              checkOutTime: checkOutTimeStr,
+            };
+
             assignment = {
-              id: activeAssignment.id.toString(),
-              workerId: activeAssignment.workerId.toString(),
-              machineId: activeAssignment.machineId.toString(),
-              operationId: activeAssignment.operationId?.toString() || '1',
-              operationName: activeTask?.operation?.name || activeAssignment.operation?.name || 'Sewing', 
+              id: (activeAssignment?.id || activeTask?.id || m.id).toString(),
+              workerId: assignedWorkerData.id.toString(),
+              machineId: m.id.toString(),
+              operationId: activeTask?.operation?.id?.toString() || activeAssignment?.operationId?.toString() || '1',
+              operationName: activeTask?.operation?.name || activeTask?.operation?.operationName || activeAssignment?.operation?.name || 'Sewing',
               projectName: activeTask?.productionOrder?.styleName || 'N/A',
               productionOrder: activeTask?.productionOrder?.orderNumber || 'N/A',
               departmentName: activeTask?.department?.name || 'Sewing Line',
               bundleId: activeTask?.bundleId?.toString() || '',
-              startedAt: activeAssignment.assignedAt || new Date().toISOString(),
+              startedAt: activeAssignment?.assignedAt || activeTask?.createdAt || new Date().toISOString(),
               targetPieces: activeTask?.targetQuantity || 100,
               completedPieces: 0
             };
+          }
+
+          // Machine seat status mapping:
+          // 'running' (Green) = Assigned Worker is Checked IN
+          // 'checked_out' (Red) = Assigned Worker Checked OUT
+          // 'idle' with worker (Blue) = Assigned Worker NOT Checked In Yet
+          // 'idle' without worker (Gray) = Unassigned / Empty Seat
+          let status: MachineStatus = 'idle';
+          if (worker) {
+            if (attendanceState === 'present') {
+              status = 'running';
+            } else if (attendanceState === 'checked_out') {
+              status = 'offline'; // Red color indicator
+            } else {
+              status = 'idle'; // Blue color indicator (Assigned, Not Started)
+            }
           }
 
           const factoryMachine: Machine = {
             id: String(uiMachine.id),
             machineNumber: uiMachine.machineId || m.machineCode || `M-${m.id}`,
             machineType: String(uiMachine.type),
-            status: worker ? 'running' : ((uiMachine.status as any) === 'active' || uiMachine.status === 'running' ? 'no_worker' : 'idle'),
+            status,
             department: uiMachine.department || 'General',
             worker,
             assignment,
@@ -95,8 +138,7 @@ export function useFactoryData(): {
             powerStatus: 'on',
             networkStatus: 'online',
             todayTimeline: [],
-            isWorking: (m.bundles && m.bundles.length > 0),
-            // Set original indices for reference, row is overridden in rendering but position matches DB
+            isWorking: (attendanceState === 'present'),
             position: { row: m.rowIndex % 2 === 0 ? 'top' : 'bottom', index: m.positionIndex != null ? m.positionIndex : index },
             roomId: m.roomId ? String(m.roomId) : undefined,
             rowIndex: m.rowIndex != null ? Number(m.rowIndex) : undefined,
@@ -110,7 +152,6 @@ export function useFactoryData(): {
           const rooms: FactoryRoom[] = floor.rooms.map((room: any) => {
             const roomMachines = rawMachines.filter((m: any) => m.roomId === room.id);
             
-            // Group machines in this room by rowIndex
             const rowMap = new Map<number, any[]>();
             roomMachines.forEach((m: any) => {
               const rowIndex = m.rowIndex || 0;
@@ -124,7 +165,6 @@ export function useFactoryData(): {
                 const machineIds = rowMachinesList.map(m => String(m.machineCode));
                 const mappedRowMachines = mappedMachines.filter((m: Machine) => machineIds.includes(m.id));
                 
-                // Sort machines within the row by positionIndex
                 mappedRowMachines.sort((a: Machine, b: Machine) => {
                   const m1 = rawMachines.find((rm: any) => String(rm.machineCode) === a.id);
                   const m2 = rawMachines.find((rm: any) => String(rm.machineCode) === b.id);
@@ -180,29 +220,34 @@ export function useFactoryData(): {
 
     loadData();
     
-    // Auto refresh every 30 seconds as fallback reconciliation
     const intervalId = setInterval(() => {
       loadData();
-    }, 30000);
+    }, 15000);
 
-    // Live WebSockets Updates
     socketService.connect();
     
-    const handleBundleUpdated = (payload: any) => {
-      // payload contains the bundle update information. We can trigger a localized update
-      // But for simplicity of react state, if a BUNDLE_UPDATED event comes, we can safely just fetch the machines
-      // or optionally do a fast patch if we have the specific data.
-      // Easiest reliable way is to just call loadData() quickly in background when a specific scan happens,
-      // because 400 machines load is very fast natively in this app.
+    const handleSyncUpdate = () => {
       loadData();
     };
 
-    socketService.on('bundle.updated', handleBundleUpdated);
+    socketService.on('attendance.updated', handleSyncUpdate);
+    socketService.on('machine.updated', handleSyncUpdate);
+    socketService.on('bundle.updated', handleSyncUpdate);
+    socketService.on('assignment.created', handleSyncUpdate);
+    socketService.on('assignment.updated', handleSyncUpdate);
+    socketService.on('dashboard.refresh', handleSyncUpdate);
+    socketService.on('dashboard.livefloor.updated', handleSyncUpdate);
 
     return () => { 
       mounted = false; 
       clearInterval(intervalId);
-      socketService.off('bundle.updated', handleBundleUpdated);
+      socketService.off('attendance.updated', handleSyncUpdate);
+      socketService.off('machine.updated', handleSyncUpdate);
+      socketService.off('bundle.updated', handleSyncUpdate);
+      socketService.off('assignment.created', handleSyncUpdate);
+      socketService.off('assignment.updated', handleSyncUpdate);
+      socketService.off('dashboard.refresh', handleSyncUpdate);
+      socketService.off('dashboard.livefloor.updated', handleSyncUpdate);
     };
   }, [refreshTrigger]);
 
